@@ -3,8 +3,9 @@ extern crate log;
 
 use std::{cell::UnsafeCell,
           fmt::{self, Debug, Formatter},
-          sync::{atomic::{AtomicBool, AtomicUsize, Ordering, ATOMIC_BOOL_INIT, ATOMIC_USIZE_INIT},
+          sync::{atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
                  Arc,
+                 Mutex,
                  Weak}};
 
 macro_rules! crit {
@@ -125,7 +126,7 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
 }
 
 pub struct VSRead<T> {
-    writing: AtomicBool,
+    writing: Mutex<()>,
     size: AtomicUsize,
     last_element: WrappedWeak<T>,
     node: WrappedNode<T>,
@@ -154,7 +155,7 @@ impl<T: Debug> Debug for VSRead<T> {
 impl<T: Debug> Default for VSRead<T> {
     fn default() -> Self {
         VSRead {
-            writing: ATOMIC_BOOL_INIT,
+            writing: Mutex::new(()),
             size: ATOMIC_USIZE_INIT,
             last_element: VoluntaryServitude::new(None),
             node: VoluntaryServitude::new(None),
@@ -189,9 +190,11 @@ impl<T: Debug> VSRead<T> {
             self.size.load(Ordering::Relaxed),
             value
         );
-        trace!("Busy blocking waiting for writing lock");
-        while !self.writing.swap(true, Ordering::Relaxed) {}
+
+        trace!("Waiting for writing lock");
+        let _lock = self.writing.lock().unwrap();
         trace!("Holding lock");
+
         let last_element = self.last_element.cell.get();
         let element = if let Some(ref weak_node) = unsafe { &*last_element } {
             if let Some(node) = weak_node.upgrade() {
@@ -233,8 +236,7 @@ impl<T: Debug> VSRead<T> {
                     }
                     self.size.store(size, Ordering::Relaxed);
                     warn!("Calling itself again to be properly ran");
-                    info!("Releasing lock to return early");
-                    self.writing.store(false, Ordering::Relaxed);
+                    info!("Releasing lock on early return");
                     return self.append(value);
                 } else {
                     crit!("No element in list");
@@ -244,8 +246,7 @@ impl<T: Debug> VSRead<T> {
                         *last_element = None;
                     }
                     warn!("Calling itself again to be properly ran");
-                    info!("Releasing lock to return early");
-                    self.writing.store(false, Ordering::Relaxed);
+                    info!("Releasing lock on early return");
                     return self.append(value);
                 }
             }
@@ -266,7 +267,6 @@ impl<T: Debug> VSRead<T> {
         self.size.fetch_add(1, Ordering::Relaxed);
         trace!("Increased size to: {}", self.size.load(Ordering::Relaxed));
         trace!("Releasing lock: {:?}", self);
-        self.writing.store(false, Ordering::Relaxed);
     }
 }
 
@@ -284,7 +284,7 @@ mod tests {
 
     fn setup() {
         STARTED.call_once(|| {
-            set_var("RUST_LOG", "trace");
+            set_var("RUST_LOG", "warn");
 
             env_logger::Builder::from_default_env()
                 .default_format_module_path(false)
@@ -307,7 +307,7 @@ mod tests {
     }
 
     #[test]
-    fn single_in_single_iter() {
+    fn single_producer_single_consumer() {
         setup();
         let count = 20;
         let list = Arc::new(VSRead::default());
@@ -327,7 +327,7 @@ mod tests {
             for (i, num) in list.iter().enumerate() {
                 assert_eq!(i + 1, *num);
                 inner_max = max(i + 1, inner_max);
-                len = max(i, len);
+                len = i;
             }
             assert!(
                 inner_max > total_max || inner_max == count || len == last_len,
@@ -343,4 +343,42 @@ mod tests {
             total_max = inner_max
         }
     }
+
+    /*
+    #[test]
+    fn multi_producers_single_consumer() {
+        setup();
+        let count = 200;
+        let list = Arc::new(VSRead::default());
+        let num_producers = 10;
+        let mut producers = vec![];
+        let finished = Arc::new(Mutex::new(0));
+
+        for _ in 0..num_producers {
+            let finished_clone = Arc::clone(&finished);
+            let list_clone = Arc::clone(&list);
+            producers.push(spawn(move || {
+                for i in 0..count {
+                    list_clone.append(i)
+                }
+                *finished_clone.lock().unwrap() += 1;
+            }));
+        }
+
+        let mut len = 0;
+        while *finished.lock().unwrap() < num_producers {
+            len = list.iter().count();
+        }
+        assert_eq!(len, num_producers * count);
+    }
+
+    #[test]
+    fn no_stackoverflow() {
+        let list = VSRead::default();
+        let overflow = i32::max_value();
+        for _ in 0..overflow {
+            list.append(0);
+        }
+    }
+    */
 }
