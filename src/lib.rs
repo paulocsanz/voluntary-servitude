@@ -12,7 +12,7 @@ macro_rules! crit {
     ($($x: expr),*) => {{
         error!("CRITICAL ERROR");
         error!($($x),*);
-        debug_assert!(false, "This should never happened but it did, something is broken and should be fixed");
+        debug_assert!(false, "This should never happen but it did, something is broken and should be fixed");
     }}
 }
 
@@ -277,7 +277,7 @@ mod tests {
     use super::*;
     use std::{cmp::max,
               env::set_var,
-              sync::{Once, ONCE_INIT},
+              sync::{atomic::AtomicBool, Once, ONCE_INIT},
               thread::spawn};
 
     static STARTED: Once = ONCE_INIT;
@@ -344,7 +344,6 @@ mod tests {
         }
     }
 
-    /*
     #[test]
     fn multi_producers_single_consumer() {
         setup();
@@ -352,33 +351,56 @@ mod tests {
         let list = Arc::new(VSRead::default());
         let num_producers = 10;
         let mut producers = vec![];
-        let finished = Arc::new(Mutex::new(0));
+        let finished = Arc::new(AtomicUsize::new(0));
 
         for _ in 0..num_producers {
             let finished_clone = Arc::clone(&finished);
             let list_clone = Arc::clone(&list);
             producers.push(spawn(move || {
                 for i in 0..count {
-                    list_clone.append(i)
+                    list_clone.append(i);
                 }
-                *finished_clone.lock().unwrap() += 1;
+                finished_clone.fetch_add(1, Ordering::Relaxed);
             }));
         }
 
-        let mut len = 0;
-        while *finished.lock().unwrap() < num_producers {
-            len = list.iter().count();
-        }
+        while finished.load(Ordering::Relaxed) < num_producers {}
+        let len = list.iter().count();
         assert_eq!(len, num_producers * count);
     }
 
     #[test]
-    fn no_stackoverflow() {
-        let list = VSRead::default();
-        let overflow = i32::max_value();
-        for _ in 0..overflow {
-            list.append(0);
+    fn single_producer_multi_consumer() {
+        setup();
+        let count = 200;
+        let list = Arc::new(VSRead::default());
+        let num_consumers = 10;
+        let mut consumers = vec![];
+        let finished = Arc::new(AtomicBool::new(false));
+
+        for _ in 0..num_consumers {
+            let finished_clone = Arc::clone(&finished);
+            let list_clone = Arc::clone(&list);
+            consumers.push(spawn(move || {
+                let mut len = 0;
+                while !finished_clone.load(Ordering::Relaxed) {
+                    let inner_len = list_clone.iter().count();
+                    assert!(inner_len >= len);
+                    len = inner_len;
+                }
+                len = list_clone.iter().count();
+                assert_eq!(len, list_clone.iter().count());
+                assert_eq!(len, count);
+            }));
+        }
+
+        for i in 0..count {
+            list.append(i);
+        }
+        finished.store(true, Ordering::Relaxed);
+
+        for thread in consumers {
+            thread.join().unwrap();
         }
     }
-    */
 }
