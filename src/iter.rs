@@ -31,19 +31,23 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
         debug!("Next element in {:?}", self);
         if self.current_index < self.size {
             if self.current_index > 0 {
-                self.current = self.current.as_ref().cloned().and_then(|vs| unsafe {
+                self.current = self.current.take().and_then(|vs| unsafe {
                     (&*(&*vs.cell.get()).next.cell.get()).as_ref().cloned()
                 });
-                debug_assert!(self.current.is_some());
             }
-            let data = self.current
-                .as_ref()
-                .map(|vs| unsafe { &(&*vs.cell.get()).value });
-            debug_assert!(data.is_some());
 
             trace!("Adding 1 to index: {}", self.current_index);
             self.current_index += 1;
 
+            let data = self.current
+                .as_ref()
+                .map(|vs| unsafe { &(&*vs.cell.get()).value })
+                .or_else(|| {
+                    crit!("self.current value is None but shouldn't: {:?}", self);
+                    self.current_index -= 1;
+                    self.size = self.current_index;
+                    None
+                });
             trace!("Element: {:?}", data);
             data
         } else {

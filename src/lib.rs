@@ -2,11 +2,11 @@
 extern crate log;
 
 macro_rules! crit {
-    ($($x: expr),*) => {{
+    ($($msg:expr),*) => {{
         error!("CRITICAL ERROR");
-        error!($($x),*);
-        debug_assert!(false, "This should never happen but it did, something is broken and should be fixed");
-    }}
+        error!($($msg),*);
+        debug_assert!(false, "Crashing in debug because this should never happen");
+    }};
 }
 
 mod iter;
