@@ -1,6 +1,5 @@
 use std::{fmt::Debug,
-          sync::{atomic::{AtomicUsize, Ordering},
-                 Arc}};
+          sync::atomic::{AtomicUsize, Ordering}};
 use types::*;
 
 #[derive(Debug)]
@@ -30,47 +29,26 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         debug!("Next element in {:?}", self);
-        self.current = if self.current_index == self.size {
-            info!("No more elements in VSReadIter");
-            self.data = None;
-            self.current.take()
-        } else if let Some(current) = self.current.take() {
-            let curr = unsafe &*current.cell.get()};
-            if self.current_index == 0 {
-                self.data = unsafe { Some(&(*curr).value) };
-                self.current_index += 1;
-                info!("First element in VSReadIter: {:?}", current);
-                Some(current)
-            } else {
-                trace!("Found element: {:?}", current);
-                let node = match unsafe { &(*(*curr).next.cell.get()) } {
-                    Some(ref next) => {
-                        self.current_index += 1;
-                        info!("Found next node ({}): {:?}", self.current_index, next);
-                        Arc::clone(next)
-                    }
-                    None => {
-                        crit!("Expected node, but found None");
-                        self.size = self.current_index;
-                        self.data = None;
-                        return self.data;
-                    }
-                };
-
-                unsafe {
-                    self.data = Some(&(*node.cell.get()).value);
-                }
-
-                Some(node)
+        if self.current_index < self.size {
+            if self.current_index > 0 {
+                self.current = self.current.as_ref().cloned().and_then(|vs| unsafe {
+                    (&*(&*vs.cell.get()).next.cell.get()).as_ref().cloned()
+                });
+                debug_assert!(self.current.is_some());
             }
-        } else {
-            crit!("self.current is None but it shouldn't: {:?}", self);
-            self.size = self.current_index;
-            self.data = None;
-            return self.data;
-        };
+            let data = self.current
+                .as_ref()
+                .map(|vs| unsafe { &(&*vs.cell.get()).value });
+            debug_assert!(data.is_some());
 
-        trace!("Element: {:?}", self.data);
-        self.data
+            trace!("Adding 1 to index: {}", self.current_index);
+            self.current_index += 1;
+
+            trace!("Element: {:?}", data);
+            data
+        } else {
+            trace!("No more elements");
+            None
+        }
     }
 }
