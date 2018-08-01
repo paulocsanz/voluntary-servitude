@@ -1,5 +1,6 @@
-use std::{fmt::Debug,
-          sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    fmt::Debug, sync::atomic::{AtomicUsize, Ordering},
+};
 use types::*;
 
 #[derive(Debug)]
@@ -28,31 +29,24 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        debug!("Next element in {:?}", self);
-        if self.current_index < self.size {
-            if self.current_index > 0 {
-                self.current = self.current.take().and_then(|vs| unsafe {
-                    (&*(&*vs.cell.get()).next.cell.get()).as_ref().cloned()
-                });
-            }
+        trace!("Next element in {:?}", self);
 
-            trace!("Adding 1 to index: {}", self.current_index);
-            self.current_index += 1;
+        let data = self.current
+            .as_ref()
+            .map(|vs| unsafe { &(&*vs.cell.get()).value });
+        debug!("Element: {:?}", data);
 
-            let data = self.current
-                .as_ref()
-                .map(|vs| unsafe { &(&*vs.cell.get()).value })
-                .or_else(|| {
-                    crit!("self.current value is None but shouldn't: {:?}", self);
-                    self.current_index -= 1;
-                    self.size = self.current_index;
-                    None
-                });
-            trace!("Element: {:?}", data);
-            data
-        } else {
-            trace!("No more elements");
-            None
-        }
+        let ended = self.current_index >= self.size;
+        always!(ended || data.is_some(), "data = {:?}", self);
+        always!(ended || self.current.is_some(), "self.current = {:?}", self);
+
+        trace!("Increasing 1 in self.current_index");
+        self.current_index += 1;
+        self.current = self.current
+            .take()
+            .filter(|_| self.current_index < self.size)
+            .map(|vs| unsafe { (&*vs.cell.get()).next.cell.get() })
+            .and_then(|node| unsafe { (&*node).as_ref().cloned() });
+        data
     }
 }

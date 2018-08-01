@@ -9,6 +9,14 @@ macro_rules! crit {
     }};
 }
 
+macro_rules! always {
+    ($cond:expr, $($msg:expr),*) => {{
+        if !$cond {
+            crit!($($msg),*);
+        }
+    }};
+}
+
 mod iter;
 mod node;
 mod types;

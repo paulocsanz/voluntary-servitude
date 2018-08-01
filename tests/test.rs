@@ -28,7 +28,7 @@ fn setup() {
 fn single_thread() {
     setup();
     let list = VSRead::default();
-    for i in 0..200000 {
+    for i in 0..10000 {
         list.append(i);
     }
 
@@ -40,7 +40,7 @@ fn single_thread() {
 #[test]
 fn single_producer_single_consumer() {
     setup();
-    let count = 100000;
+    let count = 10000;
     let list = Arc::new(VSRead::default());
     let finished = Arc::new(AtomicBool::new(false));
 
@@ -82,7 +82,7 @@ fn single_producer_single_consumer() {
 #[test]
 fn multi_producers_single_consumer() {
     setup();
-    let count = 100;
+    let count = 10;
     let list = Arc::new(VSRead::default());
     let num_producers = 1000;
     let mut producers = vec![];
@@ -112,7 +112,7 @@ fn multi_producers_single_consumer() {
 #[test]
 fn single_producer_multi_consumer() {
     setup();
-    let count = 100000;
+    let count = 10000;
     let list = Arc::new(VSRead::default());
     let num_consumers = 1000;
     let mut consumers = vec![];
@@ -147,7 +147,7 @@ fn single_producer_multi_consumer() {
 #[test]
 fn multi_producer_multi_consumer() {
     setup();
-    let count = 100;
+    let count = 10;
     let list = Arc::new(VSRead::default());
     let num_producers = 1000;
     let mut producers = vec![];
@@ -210,13 +210,19 @@ fn elements_n(num: usize) {
 }
 
 #[test]
+fn elements_100k() {
+    elements_n(100_000);
+}
+
+#[test]
+#[ignore]
 fn elements_1m() {
     elements_n(500_000);
     elements_n(1_000_000);
 }
 
-#[ignore]
 #[test]
+#[ignore]
 fn elements_50m() {
     elements_n(10_000_000);
     elements_n(50_000_000);

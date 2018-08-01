@@ -1,7 +1,7 @@
 pub use node::Node;
-use std::{cell::UnsafeCell,
-          fmt::{self, Debug, Formatter},
-          sync::{Arc, Weak}};
+use std::{
+    cell::UnsafeCell, fmt::{self, Debug, Formatter}, sync::{Arc, Weak},
+};
 pub use vsread::VSRead;
 
 pub type ArcNode<T> = Arc<VoluntaryServitude<Node<T>>>;
@@ -16,7 +16,7 @@ unsafe impl<T> Sync for VoluntaryServitude<T> {}
 
 impl<T: Debug> VoluntaryServitude<T> {
     pub fn new(value: T) -> VoluntaryServitude<T> {
-        debug!("New VoluntaryServitude based on {:?}", value);
+        trace!("New VoluntaryServitude based on {:?}", value);
         VoluntaryServitude {
             cell: UnsafeCell::new(value),
         }
@@ -25,7 +25,7 @@ impl<T: Debug> VoluntaryServitude<T> {
 
 impl<T: Debug> Debug for VoluntaryServitude<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        debug!("Debug VoluntaryServitude<T>");
+        trace!("Debug VoluntaryServitude<T>");
         write!(
             f,
             "VoluntaryServitude {{ cell: UnsafeCell {{ {:?} }} }}",
