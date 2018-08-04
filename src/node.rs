@@ -21,13 +21,35 @@ impl<T: Debug> Node<T> {
 /// Default Drop is recursive and causes a stackoverflow easily
 impl<T: Debug> Drop for Node<T> {
     fn drop(&mut self) {
+        trace!("Drop");
         info!("Drop Node<T>: {:?}", self);
-        let mut next = unsafe { (*self.next.cell.get()).take() };
-        while let Some(node) = next.take() {
-            next = unsafe { (*(*node.cell.get()).next.cell.get()).take() };
-            debug!("Dropping node: {:?}", next);
-            mem::drop(node);
+        let mut node = self;
+        loop {
+            let next = node.next.cell.get();
+            let count = if let Some(ref next) = unsafe { &*next } {
+                let (weak, strong) = (Arc::weak_count(next), Arc::strong_count(next));
+                trace!("Next strong count: {}, weak count: {}", strong, weak);
+                strong
+            } else {
+                debug!("No next node: {:?}", node);
+                mem::drop(node);
+                break;
+            };
+
+            if count > 1 {
+                unsafe { *next = None };
+                debug!("Strong count bigger than 1, leave");
+                mem::drop(node);
+                break;
+            }
+
+            if let Some(next) = unsafe { (*next).take().map(|n| &mut *n.cell.get()) } {
+                mem::drop(node);
+                trace!("Next: {:?}", next);
+                node = next;
+            }
         }
+        debug!("Leaving Drop");
     }
 }
 
