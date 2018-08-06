@@ -1,6 +1,8 @@
 pub use node::Node;
 use std::{
-    cell::UnsafeCell, fmt::{self, Debug, Formatter}, sync::{Arc, Weak},
+    cell::UnsafeCell,
+    fmt::{self, Debug, Formatter},
+    sync::{Arc, Weak},
 };
 pub use vsread::VSRead;
 

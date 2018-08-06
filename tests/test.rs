@@ -1,14 +1,16 @@
 extern crate env_logger;
 extern crate voluntary_servitude;
 
-use std::{cmp::max,
-          env::set_var,
-          mem,
-          sync::{atomic::{AtomicBool, AtomicUsize, Ordering},
-                 Arc,
-                 Once,
-                 ONCE_INIT},
-          thread::spawn};
+use std::{
+    cmp::max,
+    env::set_var,
+    mem,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Once, ONCE_INIT,
+    },
+    thread::spawn,
+};
 use voluntary_servitude::VSRead;
 
 static STARTED: Once = ONCE_INIT;

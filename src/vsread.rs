@@ -1,8 +1,10 @@
 use iter::VSReadIter;
 use std::{
-    fmt::{self, Debug, Formatter}, mem,
+    fmt::{self, Debug, Formatter},
+    mem,
     sync::{
-        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}, Arc, Mutex,
+        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+        Arc, Mutex,
     },
 };
 use types::*;

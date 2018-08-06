@@ -1,7 +1,6 @@
 use std::{
-    fmt::Debug, sync::{
-        atomic::{AtomicUsize, Ordering}, Arc,
-    },
+    fmt::Debug,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use types::*;
 
@@ -33,7 +32,8 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         trace!("Next element in {:?}", self);
 
-        let data = self.current
+        let data = self
+            .current
             .as_ref()
             .map(|vs| unsafe { &(&*vs.cell.get()).value });
         debug!("Element: {:?}", data);
@@ -43,15 +43,14 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
 
         trace!("Increasing 1 in self.current_index");
         self.current_index += 1;
-        trace!("o");
-        let last = self.current
-            .as_ref()
+        self.current = self
+            .current
+            .take()
             .filter(|_| self.current_index < self.size)
-            .and_then(|vs| unsafe { (&mut *(&*vs.cell.get()).next.cell.get()).take() });
-        trace!("i: {:?}", last);
-        self.current = last;
-        //last.and_then(|node| unsafe { (&*node).as_ref().cloned() });
-        trace!("a");
+            .and_then(|vs| unsafe {
+                let cell = &*vs.cell.get();
+                (&*cell.next.cell.get()).as_ref().cloned()
+            });
         data
     }
 }
@@ -61,7 +60,9 @@ mod tests {
     extern crate env_logger;
     use super::*;
     use std::{
-        env::set_var, mem, sync::{atomic::AtomicUsize, Once, ONCE_INIT},
+        env::set_var,
+        mem,
+        sync::{atomic::AtomicUsize, Once, ONCE_INIT},
     };
 
     static STARTED: Once = ONCE_INIT;
@@ -161,7 +162,7 @@ mod tests {
     #[test]
     fn iter_drop_new() {
         setup();
-        let iter = new_iter();
+        new_iter();
     }
 
     #[test]
@@ -169,7 +170,6 @@ mod tests {
         setup();
         let mut iter = new_iter();
         assert_eq!(iter.next(), Some(&0));
-        mem::drop(iter);
     }
 
     #[test]
@@ -177,15 +177,6 @@ mod tests {
         setup();
         let mut iter = new_iter();
         while iter.next().is_some() {}
-        mem::drop(iter);
-    }
-
-    #[test]
-    fn iter_drop_empty_ref() {
-        setup();
-        let mut iter = new_iter();
-        while iter.next().is_some() {}
-        mem::drop(iter);
     }
 
     #[test]
@@ -201,10 +192,13 @@ mod tests {
                 node = &*this.next.cell.get();
             }
         }
-        let iter1 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
-        let iter2 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
+        let mut iter1 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
+        let mut iter2 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
+        let _ = iter2.next();
+        let _ = iter2.next();
         mem::drop(iter2);
         let iter3 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
+        let _ = iter1.next();
         mem::drop(iter1);
         mem::drop(iter3);
     }
