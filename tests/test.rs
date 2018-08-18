@@ -1,4 +1,5 @@
 extern crate env_logger;
+#[macro_use]
 extern crate voluntary_servitude;
 
 use std::{
@@ -11,7 +12,6 @@ use std::{
     },
     thread::spawn,
 };
-use voluntary_servitude::VSRead;
 
 static STARTED: Once = ONCE_INIT;
 
@@ -29,7 +29,7 @@ fn setup() {
 #[test]
 fn single_thread() {
     setup();
-    let list = VSRead::default();
+    let list = vsread![];
     for i in 0..10000 {
         list.append(i);
     }
@@ -43,12 +43,12 @@ fn single_thread() {
 fn single_producer_single_consumer() {
     setup();
     let count = 10000;
-    let list = Arc::new(VSRead::default());
+    let list = Arc::new(vsread![]);
     let finished = Arc::new(AtomicBool::new(false));
 
     let list_clone = Arc::clone(&list);
     let finished_clone = Arc::clone(&finished);
-    let _ = spawn(move || {
+    let _handler = spawn(move || {
         for i in 0..count {
             list_clone.append(i + 1)
         }
@@ -85,7 +85,7 @@ fn single_producer_single_consumer() {
 fn multi_producers_single_consumer() {
     setup();
     let count = 10;
-    let list = Arc::new(VSRead::default());
+    let list = Arc::new(vsread![]);
     let num_producers = 1000;
     let mut producers = vec![];
     let finished = Arc::new(AtomicUsize::new(0));
@@ -115,7 +115,7 @@ fn multi_producers_single_consumer() {
 fn single_producer_multi_consumer() {
     setup();
     let count = 10000;
-    let list = Arc::new(VSRead::default());
+    let list = Arc::new(vsread![]);
     let num_consumers = 1000;
     let mut consumers = vec![];
     let finished = Arc::new(AtomicBool::new(false));
@@ -150,7 +150,7 @@ fn single_producer_multi_consumer() {
 fn multi_producer_multi_consumer() {
     setup();
     let count = 10;
-    let list = Arc::new(VSRead::default());
+    let list = Arc::new(vsread![]);
     let num_producers = 1000;
     let mut producers = vec![];
     let finished = Arc::new(AtomicUsize::new(0));
@@ -191,10 +191,24 @@ fn multi_producer_multi_consumer() {
     }
 }
 
+#[test]
+fn clear() {
+    setup();
+    let list = vsread![1];
+    assert_eq!(list.iter().count(), 1);
+    list.clear();
+    assert_eq!(list.iter().count(), 0);
+    list.append(3);
+    list.append(3);
+    list.append(3);
+    list.clear();
+    assert_eq!(list.iter().count(), 0);
+}
+
 fn elements_n(num: usize) {
     println!("{} users", num);
     setup();
-    let list = VSRead::default();
+    let list = vsread![];
     for i in 0..num {
         list.append(i);
     }

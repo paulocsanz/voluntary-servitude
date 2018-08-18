@@ -1,3 +1,5 @@
+//! VSRead lockfree iterator
+
 use std::{
     fmt::Debug,
     sync::atomic::{AtomicUsize, Ordering},
@@ -5,6 +7,7 @@ use std::{
 use types::*;
 
 #[derive(Debug)]
+/// Lockfree iterator
 pub struct VSReadIter<'a, T: 'a + Debug> {
     current: Option<ArcNode<T>>,
     current_index: usize,
@@ -13,6 +16,7 @@ pub struct VSReadIter<'a, T: 'a + Debug> {
 }
 
 impl<'a, T: 'a + Debug> VSReadIter<'a, T> {
+    /// Creates new lockfree iterator based on first node and total size
     pub fn new(current: &Option<ArcNode<T>>, size: &AtomicUsize) -> VSReadIter<'a, T> {
         trace!("VSReadIter start node: {:?}", current);
         // Get size before to ensure it's always lower or equal to current (no data race)
@@ -35,11 +39,11 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
         let data = self
             .current
             .as_ref()
-            .map(|vs| unsafe { &(&*vs.cell.get()).value });
+            .map(|vs| unsafe { &(*vs.cell.get()).value });
         debug!("Element: {:?}", data);
 
         let ended = self.current_index >= self.size;
-        always!(ended || data.is_some(), "data = none {:?}", self);
+        debug_assert!(ended || data.is_some(), "data = none {:?}", self);
 
         trace!("Increasing 1 in self.current_index");
         self.current_index += 1;
@@ -57,50 +61,32 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    extern crate env_logger;
     use super::*;
-    use std::{
-        env::set_var,
-        mem,
-        sync::{atomic::AtomicUsize, Once, ONCE_INIT},
-    };
-
-    static STARTED: Once = ONCE_INIT;
-
-    fn setup() {
-        STARTED.call_once(|| {
-            set_var("RUST_LOG", "trace");
-
-            env_logger::Builder::from_default_env()
-                .default_format_module_path(false)
-                .default_format_timestamp(false)
-                .init();
-        })
-    }
+    use setup_logger;
 
     #[test]
     #[should_panic]
     fn iter_lied_size_more_empty() {
-        setup();
+        setup_logger();
         for _ in VSReadIter::<()>::new(&None, &AtomicUsize::new(100)) {}
     }
 
     #[test]
     #[should_panic]
     fn iter_lied_size_more() {
-        setup();
+        setup_logger();
         for _ in VSReadIter::new(&Some(Node::arc_node(0)), &AtomicUsize::new(2)) {}
     }
 
     #[test]
     fn iter_lied_size_less_more() {
-        setup();
+        setup_logger();
         for _ in VSReadIter::new(&new_iter().current, &AtomicUsize::new(5)) {}
     }
 
     #[test]
     fn iter_lied_size_less() {
-        setup();
+        setup_logger();
         for _ in VSReadIter::new(&Some(Node::arc_node(0)), &AtomicUsize::new(0)) {}
     }
 
@@ -120,7 +106,7 @@ mod tests {
 
     #[test]
     fn iter_many() {
-        setup();
+        setup_logger();
         let count = 5;
         let first = Some(Node::arc_node(0));
         let mut node = &first;
@@ -141,14 +127,14 @@ mod tests {
 
     #[test]
     fn iter_empty() {
-        setup();
+        setup_logger();
         let mut iter = VSReadIter::<()>::new(&None, &AtomicUsize::new(0));
         assert!(iter.next().is_none());
     }
 
     #[test]
     fn iter_after_use() {
-        setup();
+        setup_logger();
         let node = Node::arc_node(0);
         let mut iter = VSReadIter::new(&Some(node), &AtomicUsize::new(1));
         assert_eq!(Some(&0), iter.next());
@@ -161,27 +147,27 @@ mod tests {
 
     #[test]
     fn iter_drop_new() {
-        setup();
-        new_iter();
+        setup_logger();
+        let _ = new_iter();
     }
 
     #[test]
     fn iter_drop_next() {
-        setup();
+        setup_logger();
         let mut iter = new_iter();
         assert_eq!(iter.next(), Some(&0));
     }
 
     #[test]
     fn iter_drop_empty() {
-        setup();
+        setup_logger();
         let mut iter = new_iter();
         while iter.next().is_some() {}
     }
 
     #[test]
     fn iter_drop_many() {
-        setup();
+        setup_logger();
         let count = 5;
         let first = Some(Node::arc_node(0));
         let mut node = &first;
@@ -196,10 +182,10 @@ mod tests {
         let mut iter2 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
         let _ = iter2.next();
         let _ = iter2.next();
-        mem::drop(iter2);
+        drop(iter2);
         let iter3 = VSReadIter::new(&first.as_ref().cloned(), &AtomicUsize::new(count));
         let _ = iter1.next();
-        mem::drop(iter1);
-        mem::drop(iter3);
+        drop(iter1);
+        drop(iter3);
     }
 }

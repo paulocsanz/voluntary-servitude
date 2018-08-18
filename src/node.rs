@@ -1,15 +1,19 @@
+//! VSRead node implementation
+
 use std::{
     fmt::{self, Debug, Formatter},
     sync::Arc,
 };
 use types::*;
 
+/// One VSRead element
 pub struct Node<T: Debug> {
     pub value: T,
     pub next: WrappedNode<T>,
 }
 
 impl<T: Debug> Node<T> {
+    /// Creates node from raw value
     pub fn arc_node(value: T) -> ArcNode<T> {
         trace!("New ArcNode Based on {:?}", value);
         Arc::new(VoluntaryServitude::new(Node {
@@ -35,6 +39,7 @@ impl<T: Debug> Drop for Node<T> {
     }
 }
 
+/// Default Debug is recursive and causes a stackoverflow easily
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         trace!("Debug Node");
