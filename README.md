@@ -2,7 +2,25 @@
 
 - Currently only implements a thread-safe appendable list with a lock-free iterator
 
+FFI implementation available, C examples are in **./examples** folder
+
+  *FFI docs are in 'ffi' module documentation*
+
+Logging is available behind the 'logs' feature
+
+  *Use RUST_LOG env var to config the level (trace, debug, info)*
+
+  Example:
+
+    RUST_LOG=trace cargo test --features "logs"
+
 **This is production ready, but not currently used, so it's not in the package manager, if you need this, just ask and I will upload it**
+
+## Api Docs
+
+Since it's not in the package manager you have to generate it, run:
+
+    cargo docs --open
 
 ## Macros
 

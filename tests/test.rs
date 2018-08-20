@@ -1,34 +1,23 @@
-extern crate env_logger;
 #[macro_use]
 extern crate voluntary_servitude;
 
 use std::{
     cmp::max,
-    env::set_var,
     mem,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Once, ONCE_INIT,
+        Arc,
     },
     thread::spawn,
 };
 
-static STARTED: Once = ONCE_INIT;
-
-fn setup() {
-    STARTED.call_once(|| {
-        set_var("RUST_LOG", "warn");
-
-        env_logger::Builder::from_default_env()
-            .default_format_module_path(false)
-            .default_format_timestamp(false)
-            .init();
-    })
+fn setup_logger() {
+    #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 }
 
 #[test]
 fn single_thread() {
-    setup();
+    setup_logger();
     let list = vsread![];
     for i in 0..10000 {
         list.append(i);
@@ -41,7 +30,7 @@ fn single_thread() {
 
 #[test]
 fn single_producer_single_consumer() {
-    setup();
+    setup_logger();
     let count = 10000;
     let list = Arc::new(vsread![]);
     let finished = Arc::new(AtomicBool::new(false));
@@ -83,7 +72,7 @@ fn single_producer_single_consumer() {
 
 #[test]
 fn multi_producers_single_consumer() {
-    setup();
+    setup_logger();
     let count = 10;
     let list = Arc::new(vsread![]);
     let num_producers = 1000;
@@ -113,7 +102,7 @@ fn multi_producers_single_consumer() {
 
 #[test]
 fn single_producer_multi_consumer() {
-    setup();
+    setup_logger();
     let count = 10000;
     let list = Arc::new(vsread![]);
     let num_consumers = 1000;
@@ -148,7 +137,7 @@ fn single_producer_multi_consumer() {
 
 #[test]
 fn multi_producer_multi_consumer() {
-    setup();
+    setup_logger();
     let count = 10;
     let list = Arc::new(vsread![]);
     let num_producers = 1000;
@@ -193,7 +182,7 @@ fn multi_producer_multi_consumer() {
 
 #[test]
 fn clear() {
-    setup();
+    setup_logger();
     let list = vsread![1];
     assert_eq!(list.iter().count(), 1);
     list.clear();
@@ -207,7 +196,7 @@ fn clear() {
 
 fn elements_n(num: usize) {
     println!("{} users", num);
-    setup();
+    setup_logger();
     let list = vsread![];
     for i in 0..num {
         list.append(i);

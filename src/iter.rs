@@ -28,6 +28,20 @@ impl<'a, T: 'a + Debug> VSReadIter<'a, T> {
             data: None,
         }
     }
+
+    /// Obtains current iterator index
+    pub fn index(&self) -> usize {
+        self.current_index
+    }
+
+    /// Obtains total size of iterator, this never changes
+    pub fn len(&self) -> usize {
+        if self.current_index == 0 && self.current.is_none() {
+            0
+        } else {
+            self.size
+        }
+    }
 }
 
 impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
@@ -39,14 +53,20 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
         let data = self
             .current
             .as_ref()
-            .map(|vs| unsafe { &(*vs.cell.get()).value });
+            .map(|vs| unsafe { &(*vs.cell.get()).value })
+            .map(|v| {
+                trace!("Increasing 1 in self.current_index");
+                self.current_index += 1;
+                v
+            });
         debug!("Element: {:?}", data);
 
-        let ended = self.current_index >= self.size;
-        debug_assert!(ended || data.is_some(), "data = none {:?}", self);
+        debug_assert!(
+            data.is_some() || self.size == 0 || self.current_index >= self.size,
+            "data = None {:?}",
+            self
+        );
 
-        trace!("Increasing 1 in self.current_index");
-        self.current_index += 1;
         self.current = self
             .current
             .take()
@@ -57,12 +77,42 @@ impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
             });
         data
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.current_index, Some(self.len()))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use setup_logger;
+
+    fn setup_logger() {
+        #[cfg(feature = "logs")] ::setup_logger();
+    }
+
+    #[test]
+    fn iter_len_index() {
+        let list = vsread![1, 2, 3];
+        let mut iter = list.iter();
+        list.append(4);
+        assert_eq!(list.len(), 4);
+        assert_eq!(iter.index(), 0);
+        assert_eq!(iter.len(), 3);
+        let _ = (1..4)
+            .map(|n| {
+                assert_eq!(iter.next(), Some(&n));
+                assert_eq!(iter.index(), n);
+            })
+            .count();
+
+        list.clear();
+        assert_eq!(list.len(), 0);
+        assert_eq!(iter.len(), 3);
+        let iter = list.iter();
+        assert_eq!(iter.len(), 0);
+        assert_eq!(iter.index(), 0);
+    }
 
     #[test]
     #[should_panic]

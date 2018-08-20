@@ -2,12 +2,7 @@
 ///
 /// ```
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
-/// # ::std::env::set_var("RUST_LOG", "trace");
-/// # env_logger::Builder::from_default_env()
-/// #       .default_format_module_path(false)
-/// #       .default_format_timestamp(false)
-/// #       .init();
+/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 /// let vsread = vsread![1, 2, 3];
 /// assert_eq!(vsread.iter().collect::<Vec<_>>(), vec![&1, &2, &3]);
 ///

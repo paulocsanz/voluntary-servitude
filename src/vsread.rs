@@ -15,13 +15,8 @@ use types::*;
 ///
 /// ```
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
-/// # ::std::env::set_var("RUST_LOG", "trace");
-/// # env_logger::Builder::from_default_env()
-/// #       .default_format_module_path(false)
-/// #       .default_format_timestamp(false)
-/// #       .init();
 /// # use voluntary_servitude::VSRead;
+/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 /// let list: VSRead<()> = vsread![]; // or VSRead::default();
 /// assert_eq!(list.iter().count(), 0);
 ///
@@ -69,17 +64,17 @@ impl<T: Debug> Default for VSRead<T> {
 }
 
 impl<T: Debug> VSRead<T> {
-    /// Turns VSRead into a lockfree iterator
+    /// Atomically extracts current size, be careful with data-races when using it
+    pub fn len(&self) -> usize {
+        self.size.load(Ordering::Relaxed)
+    }
+
+    /// Makes lock-free iterator based on VSRead
     ///
     /// ```
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
-    /// # ::std::env::set_var("RUST_LOG", "trace");
-    /// # env_logger::Builder::from_default_env()
-    /// #       .default_format_module_path(false)
-    /// #       .default_format_timestamp(false)
-    /// #       .init();
     /// # use voluntary_servitude::VSRead;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let list = vsread![3, 2];
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
     /// assert_eq!(list.iter().count(), 2);
@@ -95,13 +90,8 @@ impl<T: Debug> VSRead<T> {
     ///
     /// ```
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
-    /// # ::std::env::set_var("RUST_LOG", "trace");
-    /// # env_logger::Builder::from_default_env()
-    /// #       .default_format_module_path(false)
-    /// #       .default_format_timestamp(false)
-    /// #       .init();
     /// # use voluntary_servitude::VSRead;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let list = vsread![3, 2];
     /// assert_eq!(list.iter().count(), 2);
     ///
@@ -141,13 +131,8 @@ impl<T: Debug> VSRead<T> {
     ///
     /// ```
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # use voluntary_servitude::VSRead;
-    /// # ::std::env::set_var("RUST_LOG", "trace");
-    /// # env_logger::Builder::from_default_env()
-    /// #       .default_format_module_path(false)
-    /// #       .default_format_timestamp(false)
-    /// #       .init();
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let list = vsread![]; // or VSRead::default()
     /// assert_eq!(list.iter().count(), 0);
     ///
@@ -233,7 +218,45 @@ impl<T: Debug> Debug for VSRead<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use setup_logger;
+
+    fn setup_logger() {
+        #[cfg(feature = "logs")] ::setup_logger();
+    }
+
+    #[test]
+    fn vsread_len() {
+        setup_logger();
+        let list = vsread![1, 2, 3];
+        assert_eq!(list.len(), 3);
+        list.append(4);
+        assert_eq!(list.len(), 4);
+        list.clear();
+        assert_eq!(list.len(), 0);
+        list.append(4);
+        assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn iter_doesnt_grow() {
+        setup_logger();
+        let list = vsread![1, 2, 3];
+        let iter = list.iter();
+        list.append(4);
+        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3]);
+        let iter = list.iter();
+        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3, &4]);
+    }
+
+    #[test]
+    fn iter_doesnt_clear() {
+        setup_logger();
+        let list = vsread![1, 2, 3];
+        let iter = list.iter();
+        list.clear();
+        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3]);
+        let iter = list.iter();
+        assert_eq!(iter.collect::<Vec<_>>(), Vec::<&i32>::new());
+    }
 
     #[test]
     fn update_last_element() {
