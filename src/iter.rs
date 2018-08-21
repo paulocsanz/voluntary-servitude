@@ -6,7 +6,7 @@ use std::{
 };
 use types::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Lockfree iterator
 pub struct VSReadIter<'a, T: 'a + Debug> {
     current: Option<ArcNode<T>>,
@@ -237,5 +237,17 @@ mod tests {
         let _ = iter1.next();
         drop(iter1);
         drop(iter3);
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<VSReadIter<()>>();
+    }
+
+    #[test]
+    fn test_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<VSReadIter<()>>();
     }
 }

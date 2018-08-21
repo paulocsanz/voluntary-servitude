@@ -33,7 +33,7 @@ int main(int argc, char** argv)
         }
 
     }
-    
+
     // Creates consumers threads
     for (current_thread = 0; current_thread < num_consumers; ++current_thread) {
         if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vsread) != 0) {

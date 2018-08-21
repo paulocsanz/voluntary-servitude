@@ -6,6 +6,8 @@
 //!
 //! To enable logging set the feature 'logs' (and the appropriate config in env var)
 //!
+//! *Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature*
+//!
 //! ```bash
 //! cargo build --features "logs"
 //! ```
@@ -21,37 +23,28 @@
 //! ```
 //! # #[macro_use] extern crate voluntary_servitude;
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+//! // Create VSRead with 3 elements
+//! // vsread![] makes an empty VSRead
+//! // vsread![1; 3] makes a VSRead with 3 elements with 1 as value
+//! let list = vsread![0, 1, 2];
+//! assert_eq!(list.len(), 3);
 //!
-//! let list = vsread![]; // or VSRead::default();
-//! assert_eq!((0..10000).map(|i| list.append(i)).count(), 10000);
+//! // The 'iter' method makes a one-time lock-free iterator (VSReadIter) based on VSRead
+//! assert_eq!(list.iter().len(), 3);
+//!
+//! // You can get the current iteration index (can be compared with the length 'len')
+//! assert_eq!(list.iter().index(), 0);
+//!
+//! // Appends 9997 elements to it
+//! assert_eq!((3..10000).map(|i| list.append(i)).count(), 9997);
+//!
+//! // Iterates through all elements to ensure it's what we inserted
 //! let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
 //! assert_eq!(count, 10000);
-//! assert_eq!((0..10000).map(|i| list.append(i)).count(), 10000);
-//! let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&(i % 10000), el)).count();
-//! assert_eq!(count, 20000);
-//! ```
-//!
-//! # Single producer, single consumer
-//! ```
-//! # #[macro_use] extern crate voluntary_servitude;
-//! use std::{thread::spawn, sync::Arc};
-//!
-//! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-//! let list = Arc::new(vsread![]); // or Arc::new(VSRead::default());
-//! let producer = Arc::clone(&list);
-//! let _handler = spawn(move || {
-//!     let _ = (0..10000).map(|i| producer.append(i)).count();
-//! });
-//!
-//! loop {
-//!     let count = list.iter().count();
-//!     println!("{} elements", count);
-//!     if count == 10000 { break; }
-//! }
 //!
 //! // List can also be cleared
 //! list.clear();
-//! assert_eq!(list.iter().count(), 0);
+//! assert_eq!(list.len(), 0);
 //! ```
 //!
 //! # Multi producer, multi consumer
@@ -60,31 +53,39 @@
 //! use std::{thread::spawn, sync::Arc};
 //!
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-//! const consumers: usize = 8;
-//! const producers: usize = 4;
+//!
+//! const CONSUMERS: usize = 8;
+//! const PRODUCERS: usize = 4;
 //!
 //! let list = Arc::new(vsread![]); // or Arc::new(VSRead::default());
 //! let mut handlers = vec![];
 //!
-//! for _ in (0..producers) {
+//! // Creates producer threads to insert 10k elements each
+//! for _ in 0..PRODUCERS {
 //!     let l = Arc::clone(&list);
 //!     handlers.push(spawn(move || { let _ = (0..10000).map(|i| l.append(i)).count(); }));
 //! }
 //!
-//! for c in (0..consumers) {
+//! // Creates consumer threads to print number of elements until all elements are inserted
+//! for _ in 0..CONSUMERS {
 //!     let consumer = Arc::clone(&list);
 //!     handlers.push(spawn(move || {
 //!         loop {
 //!             let count = consumer.iter().count();
 //!             println!("{} elements", count);
-//!             if count == producers * 10000 { break; }
+//!             if count == PRODUCERS * 10000 { break; }
 //!         }
 //!     }));
+//! }
+//!
+//! // Join threads
+//! for handler in handlers.into_iter() {
+//!     handler.join().expect("Failed to join thread");
 //! }
 //! ```
 
 #![deny(
-    missing_debug_implementations, missing_docs, trivial_casts, trivial_numeric_casts,
+    missing_debug_implementations, missing_docs, trivial_numeric_casts,
     unused_extern_crates, unused_import_braces, unused_qualifications, unused_results
 )]
 #![deny(
@@ -95,6 +96,13 @@
     unions_with_drop_fields, unused, unused_allocation, unused_comparisons, unused_parens,
     while_true
 )]
+
+#[cfg(not(feature = "jemmaloc"))]
+use std::alloc::System;
+
+#[cfg(not(feature = "jemmaloc"))]
+#[global_allocator]
+static GLOBAL_ALLOC: System = System;
 
 #[macro_use]
 #[cfg(feature = "logs")]

@@ -65,6 +65,19 @@ impl<T: Debug> Default for VSRead<T> {
 
 impl<T: Debug> VSRead<T> {
     /// Atomically extracts current size, be careful with data-races when using it
+    ///
+    /// ```
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::VSRead;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vsread![3, 2];
+    /// assert_eq!(list.len(), 2);
+    /// list.append(5);
+    /// assert_eq!(list.len(), 3);
+    ///
+    /// let list: VSRead<()> = vsread![];
+    /// assert_eq!(list.len(), 0);
+    /// ```
     pub fn len(&self) -> usize {
         self.size.load(Ordering::Relaxed)
     }
@@ -100,7 +113,7 @@ impl<T: Debug> VSRead<T> {
     /// ```
     pub fn clear(&self) {
         trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().unwrap();
+        let _lock = self.writing.lock().expect("Some thread panicked while holding self.writing Mutex, lets get it on and panic too");
         trace!("Holding lock");
 
         self.size.store(0, Ordering::Relaxed);
@@ -147,7 +160,7 @@ impl<T: Debug> VSRead<T> {
         debug!("Append {}: {:?}", self.size.load(Ordering::Relaxed), value);
 
         trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().unwrap();
+        let _lock = self.writing.lock().expect("Some thread panicked while holding self.writing Mutex, lets get it on and panic too");
         trace!("Holding lock");
 
         if self.size.load(Ordering::Relaxed) == 0 {
@@ -297,5 +310,17 @@ mod tests {
         }
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&9, &8]);
         assert_eq!(list.size.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn test_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<VSRead<()>>();
+    }
+
+    #[test]
+    fn test_sync() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<VSRead<()>>();
     }
 }

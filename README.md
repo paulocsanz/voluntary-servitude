@@ -1,5 +1,7 @@
 # Voluntary Servitude
 
+*Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature*
+
 - Currently only implements a thread-safe appendable list with a lock-free iterator
 
 FFI implementation available, C examples are in **./examples** folder
