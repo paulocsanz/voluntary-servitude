@@ -46,7 +46,7 @@ pub extern "C" fn initialize_logger() {
 ///
 /// let vsread = vsread_new();
 /// assert_eq!(vsread_len(vsread), 0);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_destroy(vsread), 0);
 /// ```
 #[no_mangle]
 pub extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
@@ -73,12 +73,12 @@ pub extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
 /// assert!(vsread_iter_next(iter).is_null());
 ///
 /// let data: i32 = 3;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// let iter = vsread_iter(vsread);
 /// unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 3) }
 /// assert!(vsread_iter_next(iter).is_null());
-/// vsread_destroy(vsread);
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_destroy(vsread), 0);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
 /// assert_eq!(vsread_iter(null_mut()), null_mut());
 /// ```
@@ -107,10 +107,11 @@ pub extern "C" fn vsread_iter<'a>(
 /// let vsread = vsread_new();
 /// assert_eq!(vsread_len(vsread), 0);
 /// let data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// assert_eq!(vsread_len(vsread), 1);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
+/// // 0 length on NULL pointer
 /// assert_eq!(vsread_len(null()), 0);
 /// ```
 #[no_mangle]
@@ -124,7 +125,8 @@ pub extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize {
 
 /// Append element to VSRead, locks other writes
 ///
-/// Returns early if pointer to VSRead is NULL
+/// Returns 1 if pointer to VSRead is NULL
+/// Returns 0 otherwise
 ///
 /// Warning: UB if pointer to VSRead is invalid
 ///
@@ -135,35 +137,37 @@ pub extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize {
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let mut data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// assert_eq!(vsread_len(vsread), 1);
 ///
 /// let iter = vsread_iter(vsread);
 /// unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 5) }
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// data = 2;
 /// unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 2) }
-/// vsread_iter_destroy(iter);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
-/// // Does nothing
-/// vsread_append(null_mut(), &data as *const i32 as *const c_void);
-/// vsread_append(null_mut(), null());
+/// // Returns 1 on NULL pointer
+/// assert_eq!(vsread_append(null_mut(), &data as *const i32 as *const c_void), 1);
+/// assert_eq!(vsread_append(null_mut(), null()), 1);
 /// ```
 #[no_mangle]
-pub extern "C" fn vsread_append(list: *const VSRead<*const c_void>, element: *const c_void) {
+pub extern "C" fn vsread_append(list: *const VSRead<*const c_void>, element: *const c_void) -> u8 {
     if list.is_null() {
-        return;
+        return 1;
     }
     let list = unsafe { &*list };
     list.append(element);
+    0
 }
 
 /// Remove all elements from list, locks other writes
 ///
-/// Returns early if pointer to VSRead is NULL
+/// Returns 1 if pointer to VSRead is NULL
+/// Returns 0 otherwise
 ///
 /// Warning: UB if pointer to VSRead is invalid
 ///
@@ -174,26 +178,28 @@ pub extern "C" fn vsread_append(list: *const VSRead<*const c_void>, element: *co
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let mut data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// assert_eq!(vsread_len(vsread), 1);
-/// vsread_clear(vsread);
+/// assert_eq!(vsread_clear(vsread), 0);
 /// assert_eq!(vsread_len(vsread), 0);
 ///
-/// // Does nothing
-/// vsread_clear(null());
+/// // Returns 1 on NULL pointer
+/// assert_eq!(vsread_clear(null()), 1);
 /// ```
 #[no_mangle]
-pub extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) {
+pub extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 {
     if list.is_null() {
-        return;
+        return 1;
     }
     let list = unsafe { &*list };
     list.clear();
+    0
 }
 
 /// Free VSRead
 ///
-/// Returns early if pointer to VSRead is NULL
+/// Returns 1 if pointer to VSRead is NULL
+/// Returns 0 otherwise
 ///
 /// Warning: UB if pointer to VSRead is invalid
 ///
@@ -204,20 +210,21 @@ pub extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) {
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let mut data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// assert_eq!(vsread_len(vsread), 1);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
-/// // Does nothing
-/// vsread_destroy(null_mut());
+/// // Returns 1 on NULL pointer
+/// assert_eq!(vsread_destroy(null_mut()), 1);
 /// ```
 #[no_mangle]
-pub extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) {
+pub extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) -> u8 {
     if list.is_null() {
-        return;
+        return 1;
     }
     let list = unsafe { Box::from_raw(list) };
     drop(list);
+    0
 }
 
 /// Obtain next element in iter, returns NULL if there are no more elements
@@ -233,19 +240,20 @@ pub extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) {
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let mut data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 5) }
 /// assert!(vsread_iter_next(iter).is_null());
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// data = 2;
 /// unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 2) }
-/// vsread_iter_destroy(iter);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
+/// // Propagates NULL pointers
 /// assert!(vsread_iter_next(null_mut()).is_null());
 /// ```
 #[no_mangle]
@@ -277,18 +285,19 @@ pub extern "C" fn vsread_iter_next(iter: *mut VSReadIter<'_, *const c_void>) -> 
 /// assert_eq!(vsread_iter_len(iter), 0);
 ///
 /// let mut data: i32 = 5;
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
-/// vsread_append(vsread, &data as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 /// assert_eq!(vsread_len(vsread), 3);
 /// assert_eq!(vsread_iter_len(iter), 0);
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// assert_eq!(vsread_iter_len(iter), 3);
-/// vsread_iter_destroy(iter);
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
+/// // 0 length on NULL pointer
 /// assert_eq!(vsread_iter_len(null_mut()), 0);
 /// ```
 #[no_mangle]
@@ -313,9 +322,9 @@ pub extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_void>) ->
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let data: [i32; 3] = [4, 9, 8];
-/// vsread_append(vsread, &data[0] as *const i32 as *const c_void);
-/// vsread_append(vsread, &data[1] as *const i32 as *const c_void);
-/// vsread_append(vsread, &data[2] as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data[0] as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data[1] as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data[2] as *const i32 as *const c_void), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// assert_eq!(vsread_iter_index(iter), 0);
@@ -330,10 +339,11 @@ pub extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_void>) ->
 /// assert!(vsread_iter_next(iter).is_null());
 /// assert_eq!(vsread_iter_index(iter), 3);
 /// assert_eq!(vsread_iter_index(iter), vsread_iter_len(iter));
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
+/// // 0 index on NULL pointer
 /// assert_eq!(vsread_iter_index(null_mut()), 0);
 /// ```
 #[no_mangle]
@@ -347,7 +357,8 @@ pub extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_void>) 
 
 /// Free VSReadIter
 ///
-/// Returns early if pointer to VSReadIter is NULL
+/// Returns 1 if pointer to VSRead is NULL
+/// Returns 0 otherwise
 ///
 /// Warning: UB if pointer to VSReadIter is invalid
 ///
@@ -358,24 +369,25 @@ pub extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_void>) 
 /// # #[cfg(feature = "logs")] initialize_logger();
 /// let vsread = vsread_new();
 /// let data: [i32; 3] = [4, 9, 8];
-/// vsread_append(vsread, &data[0] as *const i32 as *const c_void);
-/// vsread_append(vsread, &data[1] as *const i32 as *const c_void);
-/// vsread_append(vsread, &data[2] as *const i32 as *const c_void);
+/// assert_eq!(vsread_append(vsread, &data[0] as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data[1] as *const i32 as *const c_void), 0);
+/// assert_eq!(vsread_append(vsread, &data[2] as *const i32 as *const c_void), 0);
 ///
 /// let iter = vsread_iter(vsread);
 /// assert_eq!(vsread_iter_len(iter), 3);
-/// vsread_iter_destroy(iter);
+/// assert_eq!(vsread_iter_destroy(iter), 0);
 ///
-/// vsread_destroy(vsread);
+/// assert_eq!(vsread_destroy(vsread), 0);
 ///
-/// // Does nothing
-/// vsread_iter_destroy(null_mut());
+/// // Returns 1 on NULL pointer
+/// assert_eq!(vsread_iter_destroy(null_mut()), 1);
 /// ```
 #[no_mangle]
-pub extern "C" fn vsread_iter_destroy(iter: *mut VSReadIter<'_, *const c_void>) {
+pub extern "C" fn vsread_iter_destroy(iter: *mut VSReadIter<'_, *const c_void>) -> u8 {
     if iter.is_null() {
-        return;
+        return 1;
     }
     let iter = unsafe { Box::from_raw(iter) };
     drop(iter);
+    0
 }

@@ -1,11 +1,19 @@
 LIBDIR=../target/release
+FLAGS=-Wall -Wextra -Wpedantic
 
-all: ffi.c $(LIBDIR)/libvoluntary_servitude.so
-	$(CC) -Wall -Wextra -Wpedantic ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
+default: all
+
+all: multithread.c ffi.c $(LIBDIR)/libvoluntary_servitude.so
+	$(CC) $(FLAGS) ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
+	$(CC) $(FLAGS) multithread.c -L$(LIBDIR) -lpthread -lvoluntary_servitude -o multithread
 
 
 $(LIBDIR)/libvoluntary_servitude.so:
 	cargo build --release
 
+test:
+	make && LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi
+	make && LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./multithread
+
 clean:
-	rm -rf target
+	rm -rf ../target ffi multithread

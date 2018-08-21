@@ -20,7 +20,6 @@
 //! # Single thread
 //! ```
 //! # #[macro_use] extern crate voluntary_servitude;
-//! use voluntary_servitude::VSRead;
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 //!
 //! let list = vsread![]; // or VSRead::default();
@@ -36,7 +35,6 @@
 //! ```
 //! # #[macro_use] extern crate voluntary_servitude;
 //! use std::{thread::spawn, sync::Arc};
-//! use voluntary_servitude::VSRead;
 //!
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 //! let list = Arc::new(vsread![]); // or Arc::new(VSRead::default());
@@ -60,7 +58,6 @@
 //! ```
 //! # #[macro_use] extern crate voluntary_servitude;
 //! use std::{thread::spawn, sync::Arc};
-//! use voluntary_servitude::VSRead;
 //!
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 //! const consumers: usize = 8;

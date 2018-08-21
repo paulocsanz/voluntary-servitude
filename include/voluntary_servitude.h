@@ -1,3 +1,8 @@
+#ifndef VOLUNTARY_SERVITUDE_H
+#define VOLUNTARY_SERVITUDE_H
+
+#include<stdlib.h>
+
 typedef struct vsread_S vsread_t;
 typedef struct vsread_iter_S vsread_iter_t;
 
@@ -12,3 +17,5 @@ extern void* vsread_iter_next(vsread_iter_t * const);
 extern size_t vsread_iter_len(const vsread_iter_t * const);
 extern size_t vsread_iter_index(const vsread_iter_t * const);
 extern void vsread_iter_destroy(vsread_iter_t * const);
+
+#endif
