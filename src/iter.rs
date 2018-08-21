@@ -88,7 +88,8 @@ mod tests {
     use super::*;
 
     fn setup_logger() {
-        #[cfg(feature = "logs")] ::setup_logger();
+        #[cfg(feature = "logs")]
+        ::setup_logger();
     }
 
     #[test]

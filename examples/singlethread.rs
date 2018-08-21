@@ -29,12 +29,20 @@ fn main() {
     }
 
     // Iterates through all elements to ensure it's what we inserted
-    let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
+    let count = list
+        .iter()
+        .enumerate()
+        .map(|(i, el)| assert_eq!(&i, el))
+        .count();
     assert_eq!(count, 10000);
 
     // Inserts 10k more elements and ensure we iterate through them
     assert_eq!((0..10000).map(|i| list.append(i)).count(), 10000);
-    let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&(i % 10000), el)).count();
+    let count = list
+        .iter()
+        .enumerate()
+        .map(|(i, el)| assert_eq!(&(i % 10000), el))
+        .count();
     assert_eq!(count, 20000);
 
     // List can also be cleared

@@ -12,7 +12,8 @@ use std::{
 };
 
 fn setup_logger() {
-    #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    #[cfg(feature = "logs")]
+    voluntary_servitude::setup_logger();
 }
 
 #[test]

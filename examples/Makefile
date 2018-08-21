@@ -1,4 +1,4 @@
-LIBDIR=../target/release
+LIBDIR=../dist
 FLAGS=-Wall -Wextra -Wpedantic
 
 default: all
@@ -10,6 +10,7 @@ all: multithread.c ffi.c $(LIBDIR)/libvoluntary_servitude.so
 
 $(LIBDIR)/libvoluntary_servitude.so:
 	cargo build --release
+	cp ../target/release/libvoluntary_servitude.so $(LIBDIR)
 
 test:
 	make && LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi

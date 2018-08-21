@@ -11,11 +11,12 @@
 /// ```
 #[macro_export]
 macro_rules! vsread {
-    ($elem: expr; $n: expr) => ({
+    () => ($crate::VSRead::default());
+    ($elem: expr; $n: expr) => {{
         let vsread = $crate::VSRead::default();
         let _ = (0..$n).map(|_| vsread.append($elem)).count();
         vsread
-    });
+    }};
     ($($x: expr),*) => ({
         let vsread = $crate::VSRead::default();
         $(

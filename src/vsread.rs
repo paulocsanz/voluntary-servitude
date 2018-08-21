@@ -74,12 +74,26 @@ impl<T: Debug> VSRead<T> {
     /// assert_eq!(list.len(), 2);
     /// list.append(5);
     /// assert_eq!(list.len(), 3);
-    ///
-    /// let list: VSRead<()> = vsread![];
+    /// list.clear();
     /// assert_eq!(list.len(), 0);
     /// ```
     pub fn len(&self) -> usize {
         self.size.load(Ordering::Relaxed)
+    }
+
+    /// Atomically checks if VSRead is empty, be careful with data-races when using it
+    ///
+    /// ```
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::VSRead;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vsread![3, 2];
+    /// assert!(!list.is_empty());
+    /// list.clear();
+    /// assert!(list.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Makes lock-free iterator based on VSRead
@@ -113,7 +127,9 @@ impl<T: Debug> VSRead<T> {
     /// ```
     pub fn clear(&self) {
         trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().expect("Some thread panicked while holding self.writing Mutex, lets get it on and panic too");
+        let _lock = self.writing.lock().expect(
+            "Some thread panicked while holding self.writing Mutex, lets get it on and panic too",
+        );
         trace!("Holding lock");
 
         self.size.store(0, Ordering::Relaxed);
@@ -160,7 +176,9 @@ impl<T: Debug> VSRead<T> {
         debug!("Append {}: {:?}", self.size.load(Ordering::Relaxed), value);
 
         trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().expect("Some thread panicked while holding self.writing Mutex, lets get it on and panic too");
+        let _lock = self.writing.lock().expect(
+            "Some thread panicked while holding self.writing Mutex, lets get it on and panic too",
+        );
         trace!("Holding lock");
 
         if self.size.load(Ordering::Relaxed) == 0 {
@@ -233,7 +251,8 @@ mod tests {
     use super::*;
 
     fn setup_logger() {
-        #[cfg(feature = "logs")] ::setup_logger();
+        #[cfg(feature = "logs")]
+        ::setup_logger();
     }
 
     #[test]

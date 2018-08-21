@@ -4,7 +4,7 @@
 
 - Currently only implements a thread-safe appendable list with a lock-free iterator
 
-FFI implementation available, C examples are in **./examples** folder
+FFI implementation available, C examples are in **./examples** folder, library is in **./dist**
 
   *FFI docs are in 'ffi' module documentation*
 
