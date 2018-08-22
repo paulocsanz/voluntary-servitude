@@ -1,76 +1,30 @@
 # Voluntary Servitude
 
-*Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature*
+* [Docs](https://docs.rs/crate/voluntary-servitude/1.0.0)
 
-- Currently only implements a thread-safe appendable list with a lock-free iterator
+- Currently implements a thread-safe appendable list with a lock-free iterator
+- FFI implementation available, C examples are in **./examples** folder
+    cd examples && make test
+- Last release is in **./dist**
 
-FFI implementation available, C examples are in **./examples** folder, library is in **./dist**
-
-  *FFI docs are in 'ffi' module documentation*
-
-Logging is available behind the 'logs' feature
-
-  *Use RUST_LOG env var to config the level (trace, debug, info)*
-
-  Example:
-
-    RUST_LOG=trace cargo test --features "logs"
-
-## Api Docs
-
-Since it's not in the package manager you have to generate it, run:
-
-    cargo docs --open
-
-## Tests
-
-Has unit tests, integrations tests, doctests and C FFI test examples
-
-Rust tests:
-
-    cargo test
-
-For C examples (tests) go to the **./examples** and run:
-
-    make test
-
-## Macros
-
-- vsread!
-
-  **Exactly like the 'vec!' macro**
-
-```
-    assert_eq!(vsread![].iter().collect::<Vec<_>>(), vec![]);
-    assert_eq!(vsread![1, 2, 3].iter().collect::<Vec<_>>(), vec![&1, &2, &3]);
-    assert_eq!(vsread![1; 3].iter().collect::<Vec<_>>(), vec![&1, &1, &1]);
-```
-
-## Datastructures
-
-- VSRead
-
-  **Appendable list that can create lock-free iterator**
-
-- VSReadIter (can't instantiate it)
-
-  **Lock-free iterator based on VSRead**
+- Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature
+- Logging is available behind the 'logs' feature and RUST_LOG env var
 
 ## Basic usage
 
 ### Single thread
 
 ```
-    // Create VSRead with 3 elements
+    // Creates VSRead with 3 elements
     // vsread![] makes an empty VSRead
-    // vsread![1; 3] makes a VSRead with 3 elements with 1 as value
+    // vsread![1; 3] makes a VSRead with 3 elements equal to 1
     let list = vsread![0, 1, 2];
     assert_eq!(list.len(), 3);
 
     // The 'iter' method makes a one-time lock-free iterator (VSReadIter) based on VSRead
     assert_eq!(list.iter().len(), 3);
 
-    // You can get the current iteration index (can be compared with the length 'len')
+    // You can get the current iteration index
     assert_eq!(list.iter().index(), 0);
 
     // Appends 9997 elements to it
