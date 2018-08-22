@@ -1,6 +1,6 @@
 # Voluntary Servitude
 
-* [Docs](https://docs.rs/crate/voluntary-servitude/1.0.0)
+* [API docs](https://docs.rs/crate/voluntary-servitude/1.0.2)
 
 - Currently implements a thread-safe appendable list with a lock-free iterator
 - FFI implementation available, C examples are in **./examples** folder

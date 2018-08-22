@@ -107,7 +107,7 @@
     while_true
 )]
 
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/1.0.1")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/1.0.2")]
 
 #[cfg(not(feature = "jemmaloc"))]
 use std::alloc::System;
