@@ -7,15 +7,15 @@ use std::{
 use types::*;
 
 /// One VSRead element
-pub struct Node<T: Debug> {
+pub struct Node<T> {
     pub value: T,
     pub next: WrappedNode<T>,
 }
 
-impl<T: Debug> Node<T> {
+impl<T> Node<T> {
     /// Creates node from raw value
     pub fn arc_node(value: T) -> ArcNode<T> {
-        trace!("New ArcNode Based on {:?}", value);
+        trace!("Create ArcNode");
         Arc::new(VoluntaryServitude::new(Node {
             value,
             next: VoluntaryServitude::new(None),
@@ -24,25 +24,24 @@ impl<T: Debug> Node<T> {
 }
 
 /// Default Drop is recursive and causes a stackoverflow easily
-impl<T: Debug> Drop for Node<T> {
+impl<T> Drop for Node<T> {
     fn drop(&mut self) {
-        info!("Drop Node<T>: {:?}", self);
+        trace!("Drop Node");
         let mut next = unsafe { (*self.next.cell.get()).take() };
         while let Some(node) = next.take() {
             if Arc::strong_count(&node) > 1 {
                 continue;
             }
             next = unsafe { (*(*node.cell.get()).next.cell.get()).take() };
-            debug!("Dropping node: {:?}", next);
+            debug!("Last reference to next node, dropping it too iteratively");
         }
-        debug!("Leaving Drop");
+        trace!("Leaving Drop");
     }
 }
 
 /// Default Debug is recursive and causes a stackoverflow easily
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        trace!("Debug Node");
         let next = if let Some(ref next) = unsafe { &*self.next.cell.get() } {
             let this = unsafe { &*next.cell.get() };
             let next = unsafe { (*this.next.cell.get()).is_some() };

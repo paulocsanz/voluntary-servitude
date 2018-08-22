@@ -24,10 +24,10 @@ pub struct VoluntaryServitude<T> {
 }
 unsafe impl<T> Sync for VoluntaryServitude<T> {}
 
-impl<T: Debug> VoluntaryServitude<T> {
+impl<T> VoluntaryServitude<T> {
     /// Creates a mutable multi-thread reference to raw value
     pub fn new(value: T) -> VoluntaryServitude<T> {
-        trace!("New VoluntaryServitude based on {:?}", value);
+        trace!("New VoluntaryServitude");
         VoluntaryServitude {
             cell: UnsafeCell::new(value),
         }
@@ -37,7 +37,6 @@ impl<T: Debug> VoluntaryServitude<T> {
 /// Recursively debugs UnsafeCell value
 impl<T: Debug> Debug for VoluntaryServitude<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        trace!("Debug VoluntaryServitude<T>");
         write!(
             f,
             "VoluntaryServitude {{ cell: UnsafeCell {{ {:?} }} }}",

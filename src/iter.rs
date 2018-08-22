@@ -1,28 +1,23 @@
 //! VSRead lockfree iterator
 
-use std::{
-    fmt::Debug,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use types::*;
 
 #[derive(Debug, Clone)]
 /// Lockfree iterator
-pub struct VSReadIter<'a, T: 'a + Debug> {
+pub struct VSReadIter<'a, T: 'a> {
     current: Option<ArcNode<T>>,
     current_index: usize,
     size: usize,
     data: Option<&'a T>,
 }
 
-impl<'a, T: 'a + Debug> VSReadIter<'a, T> {
+impl<'a, T: 'a> VSReadIter<'a, T> {
     /// Creates new lockfree iterator based on first node and total size
     pub fn new(current: &Option<ArcNode<T>>, size: &AtomicUsize) -> VSReadIter<'a, T> {
-        trace!("VSReadIter start node: {:?}", current);
-        // Get size before to ensure it's always lower or equal to current (no data race)
-        let size = size.load(Ordering::Relaxed);
+        trace!("New VSReadIter, size: {}", size.load(Ordering::Relaxed));
         VSReadIter {
-            size,
+            size: size.load(Ordering::Relaxed),
             current: current.as_ref().cloned(),
             current_index: 0,
             data: None,
@@ -31,11 +26,13 @@ impl<'a, T: 'a + Debug> VSReadIter<'a, T> {
 
     /// Obtains current iterator index
     pub fn index(&self) -> usize {
+        trace!("Index VSReadIter");
         self.current_index
     }
 
     /// Obtains total size of iterator, this never changes
     pub fn len(&self) -> usize {
+        trace!("Len VSReadIter");
         if self.current_index == 0 && self.current.is_none() {
             0
         } else {
@@ -44,41 +41,41 @@ impl<'a, T: 'a + Debug> VSReadIter<'a, T> {
     }
 }
 
-impl<'a, T: 'a + Debug> Iterator for VSReadIter<'a, T> {
+impl<'a, T: 'a> Iterator for VSReadIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        trace!("Next element in {:?}", self);
+        trace!("Next VSReadIter element");
 
         let data = self
             .current
             .as_ref()
             .map(|vs| unsafe { &(*vs.cell.get()).value })
             .map(|v| {
-                trace!("Increasing 1 in self.current_index");
+                trace!("Next: Increasing 1 in self.current_index");
                 self.current_index += 1;
                 v
             });
-        debug!("Element: {:?}", data);
+        debug!("Next: data.is_some() = {}", data.is_some());
 
         debug_assert!(
             data.is_some() || self.size == 0 || self.current_index >= self.size,
-            "data = None {:?}",
-            self
+            "data.is_some() = {}, self.size == {}, self.current_index = {}",
+            data.is_some(),
+            self.size,
+            self.current_index
         );
 
         self.current = self
             .current
             .take()
             .filter(|_| self.current_index < self.size)
-            .and_then(|vs| unsafe {
-                let cell = &*vs.cell.get();
-                (&*cell.next.cell.get()).as_ref().cloned()
-            });
+            .and_then(|vs| unsafe { (&*(*vs.cell.get()).next.cell.get()).as_ref().cloned() });
         data
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
+        trace!("VSReadIter Size Hint");
         (self.current_index, Some(self.len()))
     }
 }

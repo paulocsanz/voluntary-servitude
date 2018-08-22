@@ -4,6 +4,7 @@ version = "1.0.0"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
+license = "MIT"
 readme = "README.md"
 keywords = ["lock-free", "mutex", "iterator", "appendable", "list"]
 categories = ["concurrency"]

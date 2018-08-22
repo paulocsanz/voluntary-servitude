@@ -44,14 +44,14 @@ use types::*;
 /// let _ = iter.next();
 /// assert_eq!(iter.next(), None);
 /// ```
-pub struct VSRead<T: Debug> {
+pub struct VSRead<T> {
     writing: Arc<Mutex<()>>,
     size: AtomicUsize,
     last_element: WrappedWeak<T>,
     node: WrappedNode<T>,
 }
 
-impl<T: Debug> Default for VSRead<T> {
+impl<T> Default for VSRead<T> {
     fn default() -> Self {
         trace!("Default VSRead");
         VSRead {
@@ -63,7 +63,7 @@ impl<T: Debug> Default for VSRead<T> {
     }
 }
 
-impl<T: Debug> VSRead<T> {
+impl<T> VSRead<T> {
     /// Atomically extracts current size, be careful with data-races when using it
     ///
     /// ```
@@ -78,6 +78,7 @@ impl<T: Debug> VSRead<T> {
     /// assert_eq!(list.len(), 0);
     /// ```
     pub fn len(&self) -> usize {
+        trace!("Len VSRead");
         self.size.load(Ordering::Relaxed)
     }
 
@@ -93,6 +94,7 @@ impl<T: Debug> VSRead<T> {
     /// assert!(list.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
+        trace!("Is Empty VSRead");
         self.len() == 0
     }
 
@@ -108,9 +110,8 @@ impl<T: Debug> VSRead<T> {
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
     /// ```
     pub fn iter<'a>(&self) -> VSReadIter<'a, T> {
-        trace!("Converting VSRead to VSReadIter: {:?}", self);
-        let node = unsafe { &*self.node.cell.get() };
-        VSReadIter::new(node, &self.size)
+        trace!("Iter VSRead");
+        unsafe { VSReadIter::new(&*self.node.cell.get(), &self.size) }
     }
 
     /// Remove all elements from list (locks writing)
@@ -126,11 +127,11 @@ impl<T: Debug> VSRead<T> {
     /// assert_eq!(list.iter().count(), 0);
     /// ```
     pub fn clear(&self) {
-        trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().expect(
-            "Some thread panicked while holding self.writing Mutex, lets get it on and panic too",
-        );
-        trace!("Holding lock");
+        trace!("Clear VSRead");
+
+        debug!("Clear: Waiting for writing lock");
+        let _lock = self.writing.lock().expect("Clear: Mutex Poisoned");
+        debug!("Clear: Holding lock");
 
         self.size.store(0, Ordering::Relaxed);
         unsafe {
@@ -140,20 +141,16 @@ impl<T: Debug> VSRead<T> {
     }
 
     /// Insert element in Option and update last_element
-    fn replace_node(&self, node: *mut Option<ArcNode<T>>, value: T) {
-        debug!(
-            "AppendToLast {}: {:?}",
-            self.size.load(Ordering::Relaxed),
-            value
-        );
+    fn fill_node(&self, node: *mut Option<ArcNode<T>>, value: T) {
+        trace!("Fill Node VSRead");
         let next = Node::arc_node(value);
         let last = Some(Arc::downgrade(&next));
         unsafe {
             *node = Some(next);
             *self.last_element.cell.get() = last;
         }
-        let _ = self.size.fetch_add(1, Ordering::Relaxed);
-        trace!("Increased size to: {}", self.size.load(Ordering::Relaxed));
+        let _size = self.size.fetch_add(1, Ordering::Relaxed);
+        trace!("Fill: Increased size to: {}", _size + 1);
     }
 
     /// Insert element after last node (locks write)
@@ -173,34 +170,30 @@ impl<T: Debug> VSRead<T> {
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2, &8, &9]);
     /// ```
     pub fn append(&self, value: T) {
-        debug!("Append {}: {:?}", self.size.load(Ordering::Relaxed), value);
+        trace!("Append VSRead to {}", self.len());
 
-        trace!("Waiting for writing lock");
-        let _lock = self.writing.lock().expect(
-            "Some thread panicked while holding self.writing Mutex, lets get it on and panic too",
-        );
-        trace!("Holding lock");
+        debug!("Append: Waiting for writing lock");
+        let _lock = self.writing.lock().expect("Append: Mutex Poisoned");
+        debug!("Append: Holding lock");
 
-        if self.size.load(Ordering::Relaxed) == 0 {
-            self.replace_node(self.node.cell.get(), value);
+        if self.is_empty() {
+            info!("Append: VSRead is empty, inserting first node");
+            self.fill_node(self.node.cell.get(), value);
         } else {
+            info!("Append: Insert new node to VSRead");
             let last_element = unsafe { (*self.last_element.cell.get()).take() };
             let last_element = last_element.and_then(|el| el.upgrade());
             if let Some(ref last_next) = last_element.map(|el| unsafe { &(*el.cell.get()).next }) {
-                self.replace_node(last_next.cell.get(), value);
+                self.fill_node(last_next.cell.get(), value);
             } else {
-                debug_assert!(
-                    false,
-                    "last_element is None but size is not or failed to upgrade: {:?}",
-                    self
-                );
+                debug_assert!(false, "last_element is None or upgrade failed");
                 self.update_last_element();
-                trace!("Releasing lock to call itself again after fix: {:?}", self);
+                info!("Append: Releasing lock to call itself again after fix");
                 drop(_lock);
                 return self.append(value);
             }
         };
-        trace!("Releasing lock: {:?}", self);
+        trace!("Append: Releasing lock");
     }
 
     /// Re-obtain last element by iterating over list while locked - O(n)
@@ -209,7 +202,7 @@ impl<T: Debug> VSRead<T> {
     ///
     /// Won't be called in debug
     fn update_last_element(&self) {
-        info!("Forcefully update self.last_element - O(n)");
+        warn!("Update: Forcefully update self.last_element - O(n)");
         let mut node = unsafe { (*self.node.cell.get()).as_ref().cloned() };
         let mut last_node = None;
         let mut size = 0;
@@ -223,12 +216,10 @@ impl<T: Debug> VSRead<T> {
                     .or_else(|| None)
             });
         }
-        unsafe {
-            *self.last_element.cell.get() = last_node.as_ref().map(|arc| Arc::downgrade(arc));
-        }
+        let node = last_node.as_ref().map(|arc| Arc::downgrade(arc));
+        unsafe { *self.last_element.cell.get() = node }
         let _old_size = self.size.swap(size, Ordering::Relaxed);
-        debug!("Old size: {}, actual size: {}", _old_size, size);
-        debug!("self.last_element now is {:?}", self.last_element);
+        debug!("Update: Old size: {}, actual size: {}", _old_size, size);
     }
 }
 
@@ -312,17 +303,17 @@ mod tests {
     }
 
     #[test]
-    fn replace_node() {
+    fn fill_node() {
         setup_logger();
         let list = vsread![3, 2];
         let node = unsafe { &mut *list.node.cell.get() };
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
 
-        list.replace_node(node, 9);
+        list.fill_node(node, 9);
         let _ = list.size.swap(1, Ordering::Relaxed);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&9]);
         unsafe {
-            list.replace_node(
+            list.fill_node(
                 &mut *(&mut *node.clone().unwrap().cell.get()).next.cell.get(),
                 8,
             );

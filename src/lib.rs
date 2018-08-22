@@ -2,11 +2,15 @@
 //!
 //! Currently only implements a thread-safe appendable list with a lock-free iterator
 //!
-//! Contains FFI implementation, see C examples in **./examples**
-//!
-//! To enable logging set the feature 'logs' (and the appropriate config in env var)
+//! Contains FFI implementation, see C examples in **./examples** or in 'ffi' module
 //!
 //! *Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature*
+//!
+//! ```bash
+//! cargo build --features "jemmaloc"
+//! ```
+//!
+//! To enable logging set the feature 'logs' (and the appropriate config in env var)
 //!
 //! ```bash
 //! cargo build --features "logs"
@@ -17,6 +21,7 @@
 //! export RUST_LOG=voluntary_servitude=trace
 //! export RUST_LOG=voluntary_servitude=debug
 //! export RUST_LOG=voluntary_servitude=info
+//! export RUST_LOG=voluntary_servitude=warn
 //! ```
 //!
 //! # Single thread
@@ -125,6 +130,10 @@ macro_rules! debug {
 }
 #[cfg(not(feature = "logs"))]
 macro_rules! info {
+    ($($x:expr),*) => {};
+}
+#[cfg(not(feature = "logs"))]
+macro_rules! warn {
     ($($x:expr),*) => {};
 }
 

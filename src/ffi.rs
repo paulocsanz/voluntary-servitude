@@ -294,8 +294,7 @@ pub unsafe extern "C" fn vsread_iter<'a>(
     if vsread.is_null() {
         return null_mut();
     }
-    let vsread = &*vsread;
-    Box::into_raw(Box::new(vsread.iter()))
+    Box::into_raw(Box::new((&*vsread).iter()))
 }
 
 /// Atomically extracts current size of VSRead, be careful with data-races when using it
@@ -349,8 +348,7 @@ pub unsafe extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize
     if list.is_null() {
         return 0;
     }
-    let list = &*list;
-    list.len()
+    (&*list).len()
 }
 
 /// Append element to VSRead, locks other writes
@@ -426,8 +424,7 @@ pub unsafe extern "C" fn vsread_append(
     if list.is_null() {
         return 1;
     }
-    let list = &*list;
-    list.append(element);
+    (&*list).append(element);
     0
 }
 
@@ -483,8 +480,7 @@ pub unsafe extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 
     if list.is_null() {
         return 1;
     }
-    let list = &*list;
-    list.clear();
+    (&*list).clear();
     0
 }
 
@@ -690,8 +686,7 @@ pub unsafe extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_vo
     if iter.is_null() {
         return 0;
     }
-    let iter = &*iter;
-    iter.len()
+    (&*iter).len()
 }
 
 /// Returns current iterator index
@@ -773,8 +768,7 @@ pub unsafe extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_
     if iter.is_null() {
         return 0;
     }
-    let iter = &*iter;
-    iter.index()
+    (&*iter).index()
 }
 
 /// Free VSReadIter

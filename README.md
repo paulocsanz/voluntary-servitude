@@ -16,13 +16,23 @@ Logging is available behind the 'logs' feature
 
     RUST_LOG=trace cargo test --features "logs"
 
-**This is production ready, but not currently used, so it's not in the package manager, if you need this, just ask and I will upload it**
-
 ## Api Docs
 
 Since it's not in the package manager you have to generate it, run:
 
     cargo docs --open
+
+## Tests
+
+Has unit tests, integrations tests, doctests and C FFI test examples
+
+Rust tests:
+
+    cargo test
+
+For C examples (tests) go to the **./examples** and run:
+
+    make test
 
 ## Macros
 
