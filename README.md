@@ -4,7 +4,9 @@
 
 - Currently implements a thread-safe appendable list with a lock-free iterator
 - FFI implementation available, C examples are in **./examples** folder
-    cd examples && make test
+
+    `cd examples && make test`
+
 - Last release is in **./dist**
 
 - Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature
