@@ -11,10 +11,12 @@ all: multithread.c ffi.c $(LIBDIR)/libvoluntary_servitude.so
 $(LIBDIR)/libvoluntary_servitude.so:
 	cargo build --release
 	cp ../target/release/libvoluntary_servitude.so $(LIBDIR)
+	strip $(LIBDIR)/libvoluntary_servitude.so
 
 test:
-	make && LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi
-	make && LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./multithread
+	make
+	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi
+	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./multithread
 
 clean:
 	rm -rf ../target ffi multithread

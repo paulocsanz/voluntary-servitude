@@ -1,4 +1,5 @@
 #include<assert.h>
+#include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
 int main(int argc, char **argv) {
@@ -55,5 +56,6 @@ int main(int argc, char **argv) {
     // Unused arguments
     (void) argc;
     (void) argv;
+	printf("Single thread test ended (ffi.c)\n");
     return 0;
 }

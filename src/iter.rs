@@ -1,6 +1,6 @@
 //! VSRead lockfree iterator
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{marker::PhantomData, sync::atomic::{AtomicUsize, Ordering}};
 use types::*;
 
 #[derive(Debug, Clone)]
@@ -9,7 +9,7 @@ pub struct VSReadIter<'a, T: 'a> {
     current: Option<ArcNode<T>>,
     current_index: usize,
     size: usize,
-    data: Option<&'a T>,
+    data: PhantomData<&'a T>,
 }
 
 impl<'a, T: 'a> VSReadIter<'a, T> {
@@ -20,7 +20,7 @@ impl<'a, T: 'a> VSReadIter<'a, T> {
             size: size.load(Ordering::Relaxed),
             current: current.as_ref().cloned(),
             current_index: 0,
-            data: None,
+            data: PhantomData,
         }
     }
 
