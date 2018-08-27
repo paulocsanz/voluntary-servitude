@@ -1,4 +1,5 @@
 #include<pthread.h>
+#include<assert.h>
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
@@ -7,12 +8,12 @@ const unsigned int num_consumers = 8;
 
 const unsigned int num_producer_values = 1000;
 const unsigned int data[3] = {12, 25, 89};
+const size_t last_index = sizeof(data) / sizeof(data[0]) - 1;
 
-void* producer();
-void* consumer();
+void * producer();
+void * consumer();
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     // Rust allocates memory through malloc
     vsread_t * const vsread = vsread_new();
     unsigned int current_thread = 0;
@@ -51,8 +52,9 @@ int main(int argc, char** argv)
     }
 
     // Never forget to free the memory allocated through rust
-    vsread_destroy(vsread);
+    assert(vsread_destroy(vsread) == 0);
 
+    printf("Multithread test ended without errors\n");
     (void) argc;
     (void) argv;
     return 0;
@@ -62,25 +64,27 @@ int main(int argc, char** argv)
 void * producer(void * const vsread){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        vsread_append(vsread, (void *) (data + (index % 2)));
+        assert(vsread_append(vsread, (void *) &data[index % last_index]) == 0);
     }
     return NULL;
 }
 
 void * consumer(void * const vsread) {
     const unsigned int total_values = num_producers * num_producer_values;
-    unsigned int values = 0;
+    unsigned int values;
+
     while (values < total_values) {
         unsigned int sum = (values = 0);
         vsread_iter_t * const iter = vsread_iter(vsread);
         const void * value;
+
         while ((value = vsread_iter_next(iter)) != NULL) {
             ++values;
             sum += *(unsigned int *) value;
         }
         printf("Consumer counts %d elements summing %d.\n", values, sum);
 
-        vsread_iter_destroy(iter);
+        assert(vsread_iter_destroy(iter) == 0);
     }
     return NULL;
 }

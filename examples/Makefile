@@ -15,6 +15,8 @@ $(LIBDIR)/libvoluntary_servitude.so:
 
 test:
 	make
+	cargo run --example singlethread
+	cargo run --example multithread
 	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi
 	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./multithread
 
