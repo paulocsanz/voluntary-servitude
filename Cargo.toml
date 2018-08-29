@@ -1,6 +1,6 @@
 [package]
 name = "voluntary-servitude"
-version = "2.0.0"
+version = "2.0.1"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
@@ -20,5 +20,5 @@ env_logger = { version = "0.5", optional = true }
 [features]
 default = []
 logs = ["log", "env_logger"]
-jemmaloc = []
+system-alloc = []
 iter-sync = []

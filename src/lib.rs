@@ -4,10 +4,10 @@
 //!
 //! Contains FFI implementation, see C examples in **./examples** or in 'ffi' module
 //!
-//! *Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature*
+//! *Uses rust allocator by default, system allocator can be enable with the 'system-alloc' feature
 //!
 //! ```bash
-//! cargo build --features "jemmaloc"
+//! cargo build --features "system-alloc"
 //! ```
 //!
 //! To enable logging set the feature 'logs' (and the appropriate config in env var)
@@ -127,12 +127,12 @@
     unions_with_drop_fields, unused, unused_allocation, unused_comparisons, unused_parens,
     while_true
 )]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/2.0.0/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/2.0.1/voluntary-servitude")]
 
-#[cfg(not(feature = "jemmaloc"))]
+#[cfg(feature = "system-alloc")]
 use std::alloc::System;
 
-#[cfg(not(feature = "jemmaloc"))]
+#[cfg(feature = "system-alloc")]
 #[global_allocator]
 static GLOBAL_ALLOC: System = System;
 

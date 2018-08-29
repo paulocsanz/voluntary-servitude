@@ -1,13 +1,13 @@
 # Voluntary Servitude
 
-* [API docs](https://docs.rs/voluntary-servitude/2.0.0/voluntary-servitude)
+* [API docs](https://docs.rs/voluntary-servitude/2.0.1/voluntary-servitude)
 
 - Currently implements a thread-safe appendable list with a lock-free iterator
 - FFI implementation available, C examples are in **./examples** folder
 
     `cd examples && make test` (runs rust and C examples)
-- Last release is in **./dist**
-- Uses system allocator by default, jemmaloc can be enabled with the 'jemmaloc' feature
+- Last release is in **./dist** (uses system allocator)
+- Uses rust allocator by default, system allocator can be enable with the 'system-alloc' feature
 - Logging is available behind the 'logs' feature and RUST_LOG env var
 - The iterator can be made thread safe by enabling the feature 'iter-sync'
 

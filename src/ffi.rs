@@ -232,6 +232,8 @@ pub unsafe extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
 ///
 /// vsread_iter_drop should be called eventually for VSReadIter returned, otherwise memory will leak
 ///
+/// Iterator is not thread-safe by default, you need to compile libvoluntary_servitude.so with the cargo feature "iter-sync"
+///
 /// Returns NULL if pointer to VSRead is NULL
 ///
 /// Warning: UB if pointer to VSRead is invalid
