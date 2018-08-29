@@ -103,27 +103,29 @@ fn iter() {
         vsread_iter_destroy(iter);
         let iter = vsread_iter(new);
         vsread_append(new, &data as *const i32 as *const c_void);
-        assert_eq!(vsread_iter_len(iter), 1);
+        assert_eq!(vsread_iter_len(iter), 2);
         assert_eq!(vsread_iter_index(iter), 0);
         assert_eq!(vsread_len(new), 2);
         assert_eq!(*(vsread_iter_next(iter) as *const i32), data);
         assert_eq!(vsread_iter_index(iter), 1);
+        assert_eq!(*(vsread_iter_next(iter) as *const i32), data);
         assert!(vsread_iter_next(iter).is_null());
-        assert_eq!(vsread_iter_index(iter), 1);
+        assert_eq!(vsread_iter_index(iter), 2);
         vsread_iter_destroy(iter);
 
         let data2: i32 = 10;
         let iter = vsread_iter(new);
         assert_eq!(vsread_iter_len(iter), 2);
         vsread_append(new, &data2 as *const i32 as *const c_void);
-        assert_eq!(vsread_len(new), 3);
         vsread_append(new, &data as *const i32 as *const c_void);
-        assert_eq!(vsread_len(new), 4);
         vsread_append(new, &data2 as *const i32 as *const c_void);
-        assert_eq!(vsread_iter_len(iter), 2);
+        assert_eq!(vsread_iter_len(iter), 5);
         assert_eq!(vsread_len(new), 5);
         assert_eq!(*(vsread_iter_next(iter) as *const i32), data);
         assert_eq!(*(vsread_iter_next(iter) as *const i32), data);
+        assert_eq!(*(vsread_iter_next(iter) as *const i32), data2);
+        assert_eq!(*(vsread_iter_next(iter) as *const i32), data);
+        assert_eq!(*(vsread_iter_next(iter) as *const i32), data2);
         assert!(vsread_iter_next(iter).is_null());
 
         let iter = vsread_iter(new);

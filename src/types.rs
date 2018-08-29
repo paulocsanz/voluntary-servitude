@@ -32,6 +32,12 @@ impl<T> VoluntaryServitude<T> {
             cell: UnsafeCell::new(value),
         }
     }
+
+    /// Extracts Node from unsafe abstraction
+    #[inline(always)]
+    pub unsafe fn cell<'a>(&self) -> &'a mut T {
+        &mut *self.cell.get()
+    }
 }
 
 /// Recursively debugs UnsafeCell value
@@ -40,7 +46,7 @@ impl<T: Debug> Debug for VoluntaryServitude<T> {
         write!(
             f,
             "VoluntaryServitude {{ cell: UnsafeCell {{ {:?} }} }}",
-            unsafe { &*self.cell.get() }
+            unsafe { self.cell() }
         )
     }
 }

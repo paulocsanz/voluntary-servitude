@@ -295,10 +295,7 @@ pub unsafe extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
 pub unsafe extern "C" fn vsread_iter<'a>(
     vsread: *const VSRead<*const c_void>,
 ) -> *mut VSReadIter<'a, *const c_void> {
-    if vsread.is_null() {
-        return null_mut();
-    }
-    Box::into_raw(Box::new((&*vsread).iter()))
+    non_null!(vsread, Box::into_raw(Box::new((&*vsread).iter())), null_mut())
 }
 
 /// Atomically extracts current size of VSRead, be careful with data-races when using it
@@ -349,10 +346,7 @@ pub unsafe extern "C" fn vsread_iter<'a>(
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize {
-    if list.is_null() {
-        return 0;
-    }
-    (&*list).len()
+    non_null!(list, (&*list).len(), 0)
 }
 
 /// Append element to VSRead, locks other writes
@@ -425,10 +419,7 @@ pub unsafe extern "C" fn vsread_append(
     list: *const VSRead<*const c_void>,
     element: *const c_void,
 ) -> u8 {
-    if list.is_null() {
-        return 1;
-    }
-    (&*list).append(element);
+    non_null!(list, (&*list).append(element), 1);
     0
 }
 
@@ -481,10 +472,7 @@ pub unsafe extern "C" fn vsread_append(
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 {
-    if list.is_null() {
-        return 1;
-    }
-    (&*list).clear();
+    non_null!(list, (&*list).clear(), 1);
     0
 }
 
@@ -535,11 +523,7 @@ pub unsafe extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) -> u8 {
-    if list.is_null() {
-        return 1;
-    }
-    let list = Box::from_raw(list);
-    drop(list);
+    non_null!(list, drop(Box::from_raw(list)), 1);
     0
 }
 
@@ -608,17 +592,16 @@ pub unsafe extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) -> u8 
 pub unsafe extern "C" fn vsread_iter_next(
     iter: *mut VSReadIter<'_, *const c_void>,
 ) -> *const c_void {
-    if iter.is_null() {
-        return null();
-    }
-    let iter = &mut *iter;
+    let iter = non_null!(iter, &mut *iter, null());
     match iter.next() {
         Some(pointer) => *pointer,
         None => null(),
     }
 }
 
-/// Returns total size of iterator, this never changes
+/// Returns total size of iterator, this may grow, but never decrease
+///
+/// If iterator length was 0 during creating it will never increase because the chain is not there, you must create another
 ///
 /// Returns 0 if pointer to VSReadIter is NULL
 ///
@@ -633,20 +616,25 @@ pub unsafe extern "C" fn vsread_iter_next(
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
 ///     let vsread = vsread_new();
-///     assert_eq!(vsread_len(vsread), 0);
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_iter_len(iter), 0);
-///
 ///     let mut data: i32 = 5;
 ///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///
+///     let iter = vsread_iter(vsread);
+///     assert_eq!(vsread_len(vsread), 1);
+///     assert_eq!(vsread_iter_len(iter), 1);
+///
 ///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
 ///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 3);
-///     assert_eq!(vsread_iter_len(iter), 0);
+///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vsread_len(vsread), 4);
+///     assert_eq!(vsread_iter_len(iter), 4);
+///
+///     assert_eq!(vsread_clear(vsread), 0);
+///     assert_eq!(vsread_iter_len(iter), 4);
 ///     assert_eq!(vsread_iter_destroy(iter), 0);
 ///
 ///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_iter_len(iter), 3);
+///     assert_eq!(vsread_iter_len(iter), 0);
 ///     assert_eq!(vsread_iter_destroy(iter), 0);
 ///     assert_eq!(vsread_destroy(vsread), 0);
 ///
@@ -663,20 +651,27 @@ pub unsafe extern "C" fn vsread_iter_next(
 ///
 /// int main(int argc, char **argv) {
 ///     vsread_t * const vsread = vsread_new();
-///     assert(vsread_len(vsread) == 0);
+///     const unsigned int data = 5;
+///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///
+///     assert(vsread_len(vsread) == 1);
 ///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(vsread_iter_len(iter) == 0);
+///     assert(vsread_iter_len(iter) == 1);
 ///
 ///     const unsigned int data = 5;
 ///     assert(vsread_append(vsread, (void *) &data) == 0);
 ///     assert(vsread_append(vsread, (void *) &data) == 0);
 ///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 3);
-///     assert(vsread_iter_len(iter) == 0);
+///     assert(vsread_len(vsread) == 4);
+///     assert(vsread_iter_len(iter) == 4);
+///
+///     assert(vsread_clear() == 0);
+///     assert(vsread_iter_len(iter) == 4);
+///
 ///     assert(vsread_iter_destroy(iter) == 0);
 ///
 ///     vsread_iter_t * const iter2 = vsread_iter(vsread);
-///     assert(vsread_iter_len(iter2) == 3);
+///     assert(vsread_iter_len(iter2) == 0);
 ///     assert(vsread_iter_destroy(iter2) == 0);
 ///     assert(vsread_destroy(vsread) == 0);
 ///
@@ -687,10 +682,7 @@ pub unsafe extern "C" fn vsread_iter_next(
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_void>) -> usize {
-    if iter.is_null() {
-        return 0;
-    }
-    (&*iter).len()
+    non_null!(iter, (&*iter).len(), 0)
 }
 
 /// Returns current iterator index
@@ -769,10 +761,7 @@ pub unsafe extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_vo
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_void>) -> usize {
-    if iter.is_null() {
-        return 0;
-    }
-    (&*iter).index()
+    non_null!(iter, (&*iter).index(), 0)
 }
 
 /// Free VSReadIter
@@ -834,10 +823,6 @@ pub unsafe extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vsread_iter_destroy(iter: *mut VSReadIter<'_, *const c_void>) -> u8 {
-    if iter.is_null() {
-        return 1;
-    }
-    let iter = Box::from_raw(iter);
-    drop(iter);
+    non_null!(iter, drop(Box::from_raw(iter)), 1);
     0
 }

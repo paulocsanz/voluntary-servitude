@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Debug, Formatter},
     mem::drop,
     sync::{
-        atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
 };
@@ -46,7 +46,7 @@ use types::*;
 /// ```
 pub struct VSRead<T> {
     writing: Arc<Mutex<()>>,
-    size: AtomicUsize,
+    size: Arc<AtomicUsize>,
     last_element: WrappedWeak<T>,
     node: WrappedNode<T>,
 }
@@ -56,7 +56,7 @@ impl<T> Default for VSRead<T> {
         trace!("Default VSRead");
         VSRead {
             writing: Arc::new(Mutex::new(())),
-            size: ATOMIC_USIZE_INIT,
+            size: Arc::new(AtomicUsize::new(0)),
             last_element: VoluntaryServitude::new(None),
             node: VoluntaryServitude::new(None),
         }
@@ -111,7 +111,7 @@ impl<T> VSRead<T> {
     /// ```
     pub fn iter<'a>(&self) -> VSReadIter<'a, T> {
         trace!("Iter VSRead");
-        unsafe { VSReadIter::new(&*self.node.cell.get(), &self.size) }
+        VSReadIter::new(unsafe { self.node.cell() }, &self.size)
     }
 
     /// Remove all elements from list (locks writing)
@@ -135,8 +135,8 @@ impl<T> VSRead<T> {
 
         self.size.store(0, Ordering::Relaxed);
         unsafe {
-            *self.last_element.cell.get() = None;
-            *self.node.cell.get() = None;
+            *self.last_element.cell() = None;
+            *self.node.cell() = None;
         }
     }
 
@@ -147,7 +147,7 @@ impl<T> VSRead<T> {
         let last = Some(Arc::downgrade(&next));
         unsafe {
             *node = Some(next);
-            *self.last_element.cell.get() = last;
+            *self.last_element.cell() = last;
         }
         let _size = self.size.fetch_add(1, Ordering::Relaxed);
         trace!("Fill: Increased size to: {}", _size + 1);
@@ -181,9 +181,9 @@ impl<T> VSRead<T> {
             self.fill_node(self.node.cell.get(), value);
         } else {
             info!("Append: Insert new node to VSRead");
-            let last_element = unsafe { (*self.last_element.cell.get()).take() };
+            let last_element = unsafe { self.last_element.cell().take() };
             let last_element = last_element.and_then(|el| el.upgrade());
-            if let Some(ref last_next) = last_element.map(|el| unsafe { &(*el.cell.get()).next }) {
+            if let Some(ref last_next) = last_element.map(|el| unsafe { &el.cell().next }) {
                 self.fill_node(last_next.cell.get(), value);
             } else {
                 debug_assert!(false, "last_element is None or upgrade failed");
@@ -203,21 +203,22 @@ impl<T> VSRead<T> {
     /// Won't be called in debug
     fn update_last_element(&self) {
         warn!("Update: Forcefully update self.last_element - O(n)");
-        let mut node = unsafe { (*self.node.cell.get()).as_ref().cloned() };
+        let mut node = unsafe { self.node.cell().as_ref().cloned() };
         let mut last_node = None;
         let mut size = 0;
         while node.is_some() {
             last_node = node.clone();
             size += 1;
             node = node.and_then(|node| unsafe {
-                (*(*node.cell.get()).next.cell.get())
+                node.cell()
+                    .next()
                     .as_ref()
                     .cloned()
                     .or_else(|| None)
             });
         }
         let node = last_node.as_ref().map(|arc| Arc::downgrade(arc));
-        unsafe { *self.last_element.cell.get() = node }
+        unsafe { *self.last_element.cell() = node }
         let _old_size = self.size.swap(size, Ordering::Relaxed);
         debug!("Update: Old size: {}, actual size: {}", _old_size, size);
     }
@@ -227,7 +228,7 @@ impl<T> VSRead<T> {
 impl<T: Debug> Debug for VSRead<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         trace!("Debug VSRead");
-        let last_element = unsafe { &*self.last_element.cell.get() };
+        let last_element = unsafe { self.last_element.cell() };
         let last_element = last_element.as_ref().cloned().take().map(|w| w.upgrade());
         write!(
             f,
@@ -260,35 +261,13 @@ mod tests {
     }
 
     #[test]
-    fn iter_doesnt_grow() {
-        setup_logger();
-        let list = vsread![1, 2, 3];
-        let iter = list.iter();
-        list.append(4);
-        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3]);
-        let iter = list.iter();
-        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3, &4]);
-    }
-
-    #[test]
-    fn iter_doesnt_clear() {
-        setup_logger();
-        let list = vsread![1, 2, 3];
-        let iter = list.iter();
-        list.clear();
-        assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3]);
-        let iter = list.iter();
-        assert_eq!(iter.collect::<Vec<_>>(), Vec::<&i32>::new());
-    }
-
-    #[test]
     fn update_last_element() {
         let list = vsread![2, 3];
         unsafe {
-            *list.last_element.cell.get() = None;
+            *list.last_element.cell() = None;
             list.update_last_element();
-            assert!((*list.last_element.cell.get()).is_some());
-            let _ = (*list.last_element.cell.get())
+            assert!(list.last_element.cell().is_some());
+            let _ = list.last_element.cell()
                 .take()
                 .and_then(|el| el.upgrade())
                 .map(|el| &*el.cell.get())
@@ -298,7 +277,7 @@ mod tests {
         let list: VSRead<()> = vsread![];
         list.update_last_element();
         unsafe {
-            assert!((*list.last_element.cell.get()).is_none());
+            assert!(list.last_element.cell().is_none());
         }
     }
 
@@ -306,18 +285,13 @@ mod tests {
     fn fill_node() {
         setup_logger();
         let list = vsread![3, 2];
-        let node = unsafe { &mut *list.node.cell.get() };
+        let node = unsafe { list.node.cell() };
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
 
         list.fill_node(node, 9);
         let _ = list.size.swap(1, Ordering::Relaxed);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&9]);
-        unsafe {
-            list.fill_node(
-                &mut *(&mut *node.clone().unwrap().cell.get()).next.cell.get(),
-                8,
-            );
-        }
+        list.fill_node(unsafe { node.clone().unwrap().cell().next() }, 8);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![&9, &8]);
         assert_eq!(list.size.load(Ordering::Relaxed), 2);
     }

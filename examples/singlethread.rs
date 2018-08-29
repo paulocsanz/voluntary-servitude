@@ -75,7 +75,11 @@ fn main() {
     assert_eq!((3..ELEMENTS).map(|i| list.append(i)).count(), ELEMENTS - 3);
 
     // Iterates through all elements to ensure it's what we inserted
-    let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
+    let count = list
+        .iter()
+        .enumerate()
+        .map(|(i, el)| assert_eq!(&i, el))
+        .count();
     assert_eq!(count, ELEMENTS);
 
     let iter2 = list.iter();

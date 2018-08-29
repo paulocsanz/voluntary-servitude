@@ -21,18 +21,24 @@ impl<T> Node<T> {
             next: VoluntaryServitude::new(None),
         }))
     }
+
+    /// Extracts next ArcNode from Node
+    #[inline(always)]
+    pub unsafe fn next(&self) -> &mut Option<ArcNode<T>> {
+        self.next.cell()
+    }
 }
 
 /// Default Drop is recursive and causes a stackoverflow easily
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
         trace!("Drop Node");
-        let mut next = unsafe { (*self.next.cell.get()).take() };
+        let mut next = unsafe { self.next().take() };
         while let Some(node) = next.take() {
             if Arc::strong_count(&node) > 1 {
                 continue;
             }
-            next = unsafe { (*(*node.cell.get()).next.cell.get()).take() };
+            next = unsafe { node.cell().next().take() };
             debug!("Last reference to next node, dropping it too iteratively");
         }
         trace!("Leaving Drop");
@@ -42,9 +48,9 @@ impl<T> Drop for Node<T> {
 /// Default Debug is recursive and causes a stackoverflow easily
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let next = if let Some(ref next) = unsafe { &*self.next.cell.get() } {
-            let this = unsafe { &*next.cell.get() };
-            let next = unsafe { (*this.next.cell.get()).is_some() };
+        let next = if let Some(ref next) = unsafe { self.next() } {
+            let this = unsafe { next.cell() };
+            let next = unsafe { this.next().is_some() };
             let next = if next { "Some" } else { "None" };
             format!("Some(Node {{ value: {:?}, next: {} }})", this.value, next)
         } else {

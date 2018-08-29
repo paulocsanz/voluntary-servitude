@@ -24,6 +24,12 @@
 //! export RUST_LOG=voluntary_servitude=warn
 //! ```
 //!
+//! To make the iterator thread safe set the feature 'iter-sync
+//!
+//! ```bash
+//! cargo build --features "iter-sync"
+//! ```
+//!
 //! # Single thread
 //! ```
 //! # #[macro_use] extern crate voluntary_servitude;
@@ -121,8 +127,7 @@
     unions_with_drop_fields, unused, unused_allocation, unused_comparisons, unused_parens,
     while_true
 )]
-
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/1.0.4/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/2.0.0/voluntary-servitude")]
 
 #[cfg(not(feature = "jemmaloc"))]
 use std::alloc::System;
