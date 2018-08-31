@@ -24,6 +24,8 @@ impl<T> Node<T> {
 
     /// Extracts next ArcNode from Node
     #[inline(always)]
+    #[allow(unknown_lints)]
+    #[allow(mut_from_ref)]
     pub unsafe fn next(&self) -> &mut Option<ArcNode<T>> {
         self.next.cell()
     }
