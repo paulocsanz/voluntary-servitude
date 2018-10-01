@@ -7,7 +7,7 @@ const PRODUCERS: usize = 4;
 const ELEMENTS: usize = 10000;
 
 fn main() {
-    let list = Arc::new(vsread![]); // or Arc::new(VSRead::default());
+    let list = Arc::new(voluntary_servitude![]);
     let mut handlers = vec![];
 
     // Creates producer threads to insert 10k elements

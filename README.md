@@ -1,15 +1,19 @@
 # Voluntary Servitude
 
-* [API docs](https://docs.rs/voluntary-servitude/2.0.1/voluntary-servitude)
+* [API docs](https://docs.rs/voluntary-servitude/3.0.0/voluntary-servitude)
 
-- Currently implements a thread-safe appendable list with a lock-free iterator
+- Implements a lock-free thread-safe appendable list with a lock-free iterator
 - FFI implementation available, C examples are in **./examples** folder
 
     `cd examples && make test` (runs rust and C examples)
 - Last release is in **./dist** (uses system allocator)
 - Uses rust allocator by default, system allocator can be enable with the 'system-alloc' feature
-- Logging is available behind the 'logs' feature and RUST_LOG env var
-- The iterator can be made thread safe by enabling the feature 'iter-sync'
+- Logging is available behind the "logs" feature and RUST_LOG env var
+- Serde's Serialize/Deserialize traits available behind the 'serde-traits' feature
+
+## Licenses
+
+[MIT](LICENSE_MIT) or [Apache-2.0](LICENSE_APACHE)
 
 ## Examples
 
@@ -17,16 +21,17 @@
 
 ```
 const ELEMENTS: usize = 10000;
-// Creates VSRead with 3 elements
-// vsread![] and VSRead::default() make an empty VSRead
-// vsread![1; 3] makes a VSRead with 3 elements equal to 1
-let list = vsread![0, 1, 2];
+// Creates VoluntaryServitude with 3 elements
+// vs![], voluntary_servitude![] and VoluntaryServitude::default() make an empty VoluntaryServitude
+// vs![1; 3] or voluntary_servitude![1; 3] make a VoluntaryServitude with 3 elements equal to 1
+// vs![0, 1, 2] or voluntary_servitude![0, 1, 2] make a VoluntaryServitude with [1, 2, 3]
+let list = voluntary_servitude![0, 1, 2];
 
-// Current VSRead length
+// Current VoluntaryServitude length
 // Be careful with data-races since the value, when used, may not be true anymore
 assert_eq!(list.len(), 3);
 
-// The 'iter' method makes a one-time lock-free iterator (VSReadIter) based on VSRead
+// The 'iter' method makes a one-time lock-free iterator (VSIter) based on VoluntaryServitude
 assert_eq!(list.iter().len(), 3);
 
 // You can get the current iteration index
@@ -61,15 +66,14 @@ println!("Single thread example ended without errors");
 ### Multi producer, multi consumer
 
 ```
-#[macro_use] extern crate voluntary_servitude;
-use std::{thread::spawn, sync::Arc};
+use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;
 const PRODUCERS: usize = 4;
 const ELEMENTS: usize = 10000;
 
 fn main() {
-    let list = Arc::new(vsread![]); // or Arc::new(VSRead::default());
+    let list = Arc::new(vs![]); // or voluntary_servitude![] or VoluntaryServitude::default();
     let mut handlers = vec![];
 
     // Creates producer threads to insert 10k elements
@@ -107,51 +111,50 @@ fn main() {
 #include "include/voluntary_servitude.h"
 
 int main(int argc, char **argv) {
-    // Rust allocates memory through malloc
-    vsread_t * vsread = vsread_new();
+    vs_t * vs = vs_new();
 
-    // Current vsread_t length
+    // Current vs_t length
     // Be careful with data-races since the value, when used, may not be true anymore
-    assert(vsread_len(vsread) == 0);
+    assert(vs_len(vs) == 0);
 
     const unsigned int data[2] = {12, 25};
-    // Inserts void pointer to data to end of vsread_t
-    vsread_append(vsread, (void *) &data[0]);
-    vsread_append(vsread, (void *) &data[1]);
+    // Inserts void pointer to data to the end of vs_t
+    vs_append(vs, (void *) &data[0]);
+    vs_append(vs, (void *) &data[1]);
 
-    // Creates a one-time lock-free iterator based on vsread_t
-    vsread_iter_t * iter = vsread_iter(vsread);
-    // Index changes as you iter through vsread_iter_t
-    assert(vsread_iter_index(iter) == 0);
+    // Creates a one-time lock-free iterator based on vs_t
+    vs_iter_t * iter = vs_iter(vs);
+    // Index changes as you iter through vs_iter_t
+    assert(vs_iter_index(iter) == 0);
 
-    // Clearing vsread_t, doesn't change existing iterators
-    vsread_clear(vsread);
-    assert(vsread_len(vsread) == 0);
-    assert(vsread_iter_len(iter) == 2);
+    // Clearing vs_t, doesn't change existing iterators
+    vs_clear(vs);
+    assert(vs_len(vs) == 0);
+    assert(vs_iter_len(iter) == 2);
 
-    assert(*(unsigned int *) vsread_iter_next(iter) == 12);
-    assert(vsread_iter_index(iter) == 1);
-    assert(*(unsigned int *) vsread_iter_next(iter) == 25);
-    assert(vsread_iter_index(iter) == 2);
+    assert(*(unsigned int *) vs_iter_next(iter) == 12);
+    assert(vs_iter_index(iter) == 1);
+    assert(*(unsigned int *) vs_iter_next(iter) == 25);
+    assert(vs_iter_index(iter) == 2);
 
-    assert(vsread_iter_next(iter) == NULL);
-    assert(vsread_iter_index(iter) == 2);
-    assert(vsread_iter_len(iter) == 2);
+    assert(vs_iter_next(iter) == NULL);
+    assert(vs_iter_index(iter) == 2);
+    assert(vs_iter_len(iter) == 2);
 
-    // Never forget to free vsread_iter_t
-    assert(vsread_iter_destroy(iter) == 0);
+    // Never forget to free vs_iter_t
+    assert(vs_iter_destroy(iter) == 0);
 
-    // Create updated vsread_iter_t
-    vsread_iter_t * iter2 = vsread_iter(vsread);
+    // Create updated vs_iter_t
+    vs_iter_t * iter2 = vs_iter(vs);
 
-    // Never forget to free vsread_t
-    assert(vsread_destroy(vsread) == 0);
+    // Never forget to free vs_t
+    assert(vs_destroy(vs) == 0);
 
-    // vsread_iter_t keeps existing after the original vsread_t is freed
-    assert(vsread_iter_len(iter2) == 0);
-    assert(vsread_iter_next(iter2) == NULL);
-    assert(vsread_iter_index(iter2) == 0);
-    assert(vsread_iter_destroy(iter2) == 0);
+    // vs_iter_t keeps existing after the original vs_t is freed
+    assert(vs_iter_len(iter2) == 0);
+    assert(vs_iter_next(iter2) == NULL);
+    assert(vs_iter_index(iter2) == 0);
+    assert(vs_iter_destroy(iter2) == 0);
 
     printf("Single thread example ended without errors\n");
     (void) argc;
@@ -179,8 +182,9 @@ void * producer();
 void * consumer();
 
 int main(int argc, char** argv) {
-    // Rust allocates memory through malloc
-    vsread_t * const vsread = vsread_new();
+    // You are responsible for making sure 'vs' exists
+    // while the producers and consumers do
+    vs_t * const vs = vs_new();
     unsigned int current_thread = 0;
     pthread_attr_t attr;
     pthread_t consumers[num_consumers],
@@ -193,7 +197,7 @@ int main(int argc, char** argv) {
 
     // Creates producer threads
     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
-        if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vsread) != 0) {
+        if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create producer thread %d.\n", current_thread);
             exit(-2);
         }
@@ -202,13 +206,13 @@ int main(int argc, char** argv) {
 
     // Creates consumers threads
     for (current_thread = 0; current_thread < num_consumers; ++current_thread) {
-        if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vsread) != 0) {
+        if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create consumer thread %d.\n", current_thread);
             exit(-3);
         }
     }
 
-    // Join all threads, ensuring vsread_t* is not used anymore
+    // Join all threads, ensuring vs_t* is not used anymore
     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
         pthread_join(producers[current_thread], NULL);
     }
@@ -217,7 +221,7 @@ int main(int argc, char** argv) {
     }
 
     // Never forget to free the memory allocated through rust
-    assert(vsread_destroy(vsread) == 0);
+    assert(vs_destroy(vs) == 0);
 
     printf("Multi thread example ended without errors\n");
     (void) argc;
@@ -226,30 +230,30 @@ int main(int argc, char** argv) {
 }
 
 
-void * producer(void * const vsread){
+void * producer(void * const vs){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        assert(vsread_append(vsread, (void *) &data[index % last_index]) == 0);
+        assert(vs_append(vs, (void *) &data[index % last_index]) == 0);
     }
     return NULL;
 }
 
-void * consumer(void * const vsread) {
+void * consumer(void * const vs) {
     const unsigned int total_values = num_producers * num_producer_values;
     unsigned int values;
 
     while (values < total_values) {
         unsigned int sum = (values = 0);
-        vsread_iter_t * const iter = vsread_iter(vsread);
+        vs_iter_t * const iter = vs_iter(vs);
         const void * value;
 
-        while ((value = vsread_iter_next(iter)) != NULL) {
+        while ((value = vs_iter_next(iter)) != NULL) {
             ++values;
             sum += *(unsigned int *) value;
         }
         printf("Consumer counts %d elements summing %d.\n", values, sum);
 
-        assert(vsread_iter_destroy(iter) == 0);
+        assert(vs_iter_destroy(iter) == 0);
     }
     return NULL;
 }

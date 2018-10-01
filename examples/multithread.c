@@ -1,5 +1,6 @@
 #include<pthread.h>
 #include<assert.h>
+#include<stdlib.h>
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
@@ -14,8 +15,8 @@ void * producer();
 void * consumer();
 
 int main(int argc, char** argv) {
-    // Rust allocates memory through malloc
-    vsread_t * const vsread = vsread_new();
+    // You are responsible for making sure 'vs' exists while accessed
+    vs_t * vs = vs_new();
     unsigned int current_thread = 0;
     pthread_attr_t attr;
     pthread_t consumers[num_consumers],
@@ -28,7 +29,7 @@ int main(int argc, char** argv) {
 
     // Creates producer threads
     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
-        if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vsread) != 0) {
+        if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create producer thread %d.\n", current_thread);
             exit(-2);
         }
@@ -37,13 +38,13 @@ int main(int argc, char** argv) {
 
     // Creates consumers threads
     for (current_thread = 0; current_thread < num_consumers; ++current_thread) {
-        if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vsread) != 0) {
+        if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create consumer thread %d.\n", current_thread);
             exit(-3);
         }
     }
 
-    // Join all threads, ensuring vsread_t* is not used anymore
+    // Join all threads, ensuring vs_t* is not used anymore
     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
         pthread_join(producers[current_thread], NULL);
     }
@@ -52,39 +53,38 @@ int main(int argc, char** argv) {
     }
 
     // Never forget to free the memory allocated through rust
-    assert(vsread_destroy(vsread) == 0);
+    assert(vs_destroy(vs) == 0);
 
-    printf("Multithread test ended without errors\n");
+    printf("Multi thread example ended without errors\n");
     (void) argc;
     (void) argv;
     return 0;
 }
 
-
-void * producer(void * const vsread){
+void * producer(void * vs){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        assert(vsread_append(vsread, (void *) &data[index % last_index]) == 0);
+        assert(vs_append(vs, (void *) &data[index % last_index]) == 0);
     }
     return NULL;
 }
 
-void * consumer(void * const vsread) {
+void * consumer(void * vs) {
     const unsigned int total_values = num_producers * num_producer_values;
-    unsigned int values;
+    unsigned int values = 0;
 
     while (values < total_values) {
         unsigned int sum = (values = 0);
-        vsread_iter_t * const iter = vsread_iter(vsread);
-        const void * value;
+        vs_iter_t * iter = vs_iter(vs);
+        void * value;
 
-        while ((value = vsread_iter_next(iter)) != NULL) {
+        while ((value = vs_iter_next(iter)) != NULL) {
             ++values;
             sum += *(unsigned int *) value;
         }
         printf("Consumer counts %d elements summing %d.\n", values, sum);
 
-        assert(vsread_iter_destroy(iter) == 0);
+        assert(vs_iter_destroy(iter) == 0);
     }
     return NULL;
 }

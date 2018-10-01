@@ -1,63 +1,85 @@
-//! VSRead node implementation
+//! `VoluntaryServitude` node implementation
 
-use std::{
-    fmt::{self, Debug, Formatter},
-    sync::Arc,
-};
-use types::*;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::{fmt, fmt::Debug, fmt::Formatter, ptr::null_mut, ptr::NonNull};
 
-/// One VSRead element
+/// One `VoluntaryServitude` element
 pub struct Node<T> {
-    pub value: T,
-    pub next: WrappedNode<T>,
+    /// Inner value
+    value: T,
+    /// Next node in chain
+    next: AtomicPtr<Node<T>>,
 }
 
 impl<T> Node<T> {
-    /// Creates node from raw value
-    pub fn arc_node(value: T) -> ArcNode<T> {
-        trace!("Create ArcNode");
-        Arc::new(VoluntaryServitude::new(Node {
-            value,
-            next: VoluntaryServitude::new(None),
-        }))
+    /// Returns reference to inner value
+    #[inline]
+    pub fn value(&self) -> &T {
+        trace!("Node value");
+        &self.value
     }
 
-    /// Extracts next ArcNode from Node
-    #[inline(always)]
-    #[allow(unknown_lints)]
-    #[allow(mut_from_ref)]
-    pub unsafe fn next(&self) -> &mut Option<ArcNode<T>> {
-        self.next.cell()
+    /// Creates new node with inner value
+    #[inline]
+    pub fn new(value: T) -> Self {
+        trace!("New node");
+        Self {
+            value,
+            next: AtomicPtr::new(null_mut()),
+        }
+    }
+
+    /// Returns consumable reference to Self
+    #[inline]
+    pub fn next(&self) -> Option<NonNull<Self>> {
+        trace!("Next node");
+        NonNull::new(self.next.load(Ordering::SeqCst))
+    }
+
+    /// Replaces `self.next` with pointer, returns old pointer
+    #[inline]
+    pub fn swap_next(&self, ptr: *mut Self) -> Option<NonNull<Self>> {
+        trace!("Swap next node");
+        NonNull::new(self.next.swap(ptr, Ordering::SeqCst))
     }
 }
 
 /// Default Drop is recursive and causes a stackoverflow easily
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
-        trace!("Drop Node");
-        let mut next = unsafe { self.next().take() };
-        while let Some(node) = next.take() {
-            if Arc::strong_count(&node) > 1 {
-                continue;
+        info!("Drop chained nodes");
+        let mut node = self.next.swap(null_mut(), Ordering::SeqCst);
+        while !node.is_null() {
+            unsafe {
+                let next = (*node).next.swap(null_mut(), Ordering::SeqCst);
+                drop(Box::from_raw(node));
+                node = next;
             }
-            next = unsafe { node.cell().next().take() };
-            debug!("Last reference to next node, dropping it too iteratively");
         }
-        trace!("Leaving Drop");
+        trace!("Dropped all chained nodes");
     }
 }
 
 /// Default Debug is recursive and causes a stackoverflow easily
 impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let next = if let Some(ref next) = unsafe { self.next() } {
-            let this = unsafe { next.cell() };
-            let next = unsafe { this.next().is_some() };
-            let next = if next { "Some" } else { "None" };
-            format!("Some(Node {{ value: {:?}, next: {} }})", this.value, next)
+        trace!("Debug Node");
+        write!(f, "Node {{ value: {:?}, next: ", self.value)?;
+        let next = self.next.load(Ordering::SeqCst);
+        if next.is_null() {
+            write!(f, "None }}")?;
         } else {
-            "None".to_owned()
-        };
-        write!(f, "Node {{ value: {:?}, next: {} }}", self.value, &next)
+            unsafe {
+                let next_next = (*next).next.load(Ordering::SeqCst);
+                let has_next = if next_next.is_null() { "Some" } else { "None" };
+                write!(
+                    f,
+                    "Some(Node {{ value: {:?}, next: {} }}) }}",
+                    (*next).value,
+                    has_next
+                )?;
+            }
+        }
+        Ok(())
     }
 }

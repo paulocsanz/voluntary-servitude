@@ -2,21 +2,20 @@
 #define VOLUNTARY_SERVITUDE_H
 
 #include<stdint.h>
-#include<stdlib.h>
 
-typedef struct vsread_S vsread_t;
-typedef struct vsread_iter_S vsread_iter_t;
+typedef struct vs_S vs_t;
+typedef struct vs_iter_S vs_iter_t;
 
-extern vsread_t * vsread_new(void);
-extern vsread_iter_t* vsread_iter(const vsread_t * const);
-extern size_t vsread_len(const vsread_t * const);
-extern uint8_t vsread_append(vsread_t * const, const void * const);
-extern uint8_t vsread_clear(vsread_t * const);
-extern uint8_t vsread_destroy(vsread_t * const);
+extern vs_t * vs_new(void);
+extern vs_iter_t * vs_iter(vs_t * const);
+extern size_t vs_len(const vs_t * const);
+extern uint8_t vs_append(vs_t * const, const void * const);
+extern uint8_t vs_clear(vs_t * const);
+extern uint8_t vs_destroy(vs_t * const);
 
-extern void * vsread_iter_next(vsread_iter_t * const);
-extern size_t vsread_iter_len(const vsread_iter_t * const);
-extern size_t vsread_iter_index(const vsread_iter_t * const);
-extern uint8_t vsread_iter_destroy(vsread_iter_t * const);
+extern void * vs_iter_next(vs_iter_t * const);
+extern size_t vs_iter_len(const vs_iter_t * const);
+extern size_t vs_iter_index(const vs_iter_t * const);
+extern uint8_t vs_iter_destroy(vs_iter_t * const);
 
 #endif

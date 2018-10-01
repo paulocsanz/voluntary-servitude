@@ -1,15 +1,11 @@
 #[macro_use]
 extern crate voluntary_servitude;
 
-use std::{
-    cmp::max,
-    mem,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
-    thread::spawn,
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
 };
+use std::{cmp::max, mem, thread::spawn};
 
 fn setup_logger() {
     #[cfg(feature = "logs")]
@@ -19,7 +15,7 @@ fn setup_logger() {
 #[test]
 fn single_thread() {
     setup_logger();
-    let list = vsread![];
+    let list = voluntary_servitude![];
     for i in 0..10000 {
         list.append(i);
     }
@@ -33,7 +29,7 @@ fn single_thread() {
 fn single_producer_single_consumer() {
     setup_logger();
     let count = 10000;
-    let list = Arc::new(vsread![]);
+    let list = Arc::new(voluntary_servitude![]);
     let finished = Arc::new(AtomicBool::new(false));
 
     let list_clone = Arc::clone(&list);
@@ -75,7 +71,7 @@ fn single_producer_single_consumer() {
 fn multi_producers_single_consumer() {
     setup_logger();
     let count = 10;
-    let list = Arc::new(vsread![]);
+    let list = Arc::new(voluntary_servitude![]);
     let num_producers = 1000;
     let mut producers = vec![];
     let finished = Arc::new(AtomicUsize::new(0));
@@ -105,7 +101,7 @@ fn multi_producers_single_consumer() {
 fn single_producer_multi_consumer() {
     setup_logger();
     let count = 10000;
-    let list = Arc::new(vsread![]);
+    let list = Arc::new(voluntary_servitude![]);
     let num_consumers = 1000;
     let mut consumers = vec![];
     let finished = Arc::new(AtomicBool::new(false));
@@ -140,7 +136,7 @@ fn single_producer_multi_consumer() {
 fn multi_producer_multi_consumer() {
     setup_logger();
     let count = 10;
-    let list = Arc::new(vsread![]);
+    let list = Arc::new(voluntary_servitude![]);
     let num_producers = 1000;
     let mut producers = vec![];
     let finished = Arc::new(AtomicUsize::new(0));
@@ -184,7 +180,7 @@ fn multi_producer_multi_consumer() {
 #[test]
 fn clear() {
     setup_logger();
-    let list = vsread![1];
+    let list = voluntary_servitude![1];
     assert_eq!(list.iter().count(), 1);
     list.clear();
     assert_eq!(list.iter().count(), 0);
@@ -198,7 +194,7 @@ fn clear() {
 fn elements_n(num: usize) {
     println!("{} users", num);
     setup_logger();
-    let list = vsread![];
+    let list = voluntary_servitude![];
     for i in 0..num {
         list.append(i);
     }

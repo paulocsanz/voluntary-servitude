@@ -2,6 +2,10 @@
 //!
 //! Allows using this rust library as a C library
 //!
+//! While `vs_t` ([`VoluntaryServitude`] in C) is thread-safe it's your responsibility to make sure it exists while pointers to it exist
+//!
+//! [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
+//!
 //! # Single-thread C implementation
 //!
 //! ```c
@@ -10,51 +14,51 @@
 //! #include "include/voluntary_servitude.h"
 //!
 //! int main(int argc, char **argv) {
-//!     // Rust allocates memory through malloc
-//!     vsread_t * vsread = vsread_new();
+//!     // You are responsible for making sure 'vs' exists while accessed
+//!     vs_t * vs = vs_new();
 //!
-//!     // Current vsread_t length
+//!     // Current vs_t length
 //!     // Be careful with data-races since the value, when used, may not be true anymore
-//!     assert(vsread_len(vsread) == 0);
+//!     assert(vs_len(vs) == 0);
 //!
 //!     const unsigned int data[2] = {12, 25};
-//!     // Inserts void pointer to data to end of vsread_t
-//!     vsread_append(vsread, (void *) &data[0]);
-//!     vsread_append(vsread, (void *) &data[1]);
+//!     // Inserts void pointer to data to end of vs_t
+//!     vs_append(vs, (void *) &data[0]);
+//!     vs_append(vs, (void *) &data[1]);
 //!
-//!     // Creates a one-time lock-free iterator based on vsread_t
-//!     vsread_iter_t * iter = vsread_iter(vsread);
-//!     // Index changes as you iter through vsread_iter_t
-//!     assert(vsread_iter_index(iter) == 0);
+//!     // Creates a one-time lock-free iterator based on vs_t
+//!     vs_iter_t * iter = vs_iter(vs);
+//!     // Index changes as you iter through vs_iter_t
+//!     assert(vs_iter_index(iter) == 0);
 //!
-//!     // Clearing vsread_t, doesn't change existing iterators
-//!     vsread_clear(vsread);
-//!     assert(vsread_len(vsread) == 0);
-//!     assert(vsread_iter_len(iter) == 2);
+//!     // Clearing vs_t, doesn't change existing iterators
+//!     vs_clear(vs);
+//!     assert(vs_len(vs) == 0);
+//!     assert(vs_iter_len(iter) == 2);
 //!
-//!     assert(*(unsigned int *) vsread_iter_next(iter) == 12);
-//!     assert(vsread_iter_index(iter) == 1);
-//!     assert(*(unsigned int *) vsread_iter_next(iter) == 25);
-//!     assert(vsread_iter_index(iter) == 2);
+//!     assert(*(unsigned int *) vs_iter_next(iter) == 12);
+//!     assert(vs_iter_index(iter) == 1);
+//!     assert(*(unsigned int *) vs_iter_next(iter) == 25);
+//!     assert(vs_iter_index(iter) == 2);
 //!
-//!     assert(vsread_iter_next(iter) == NULL);
-//!     assert(vsread_iter_index(iter) == 2);
-//!     assert(vsread_iter_len(iter) == 2);
+//!     assert(vs_iter_next(iter) == NULL);
+//!     assert(vs_iter_index(iter) == 2);
+//!     assert(vs_iter_len(iter) == 2);
 //!
-//!     // Never forget to free vsread_iter_t
-//!     assert(vsread_iter_destroy(iter) == 0);
+//!     // Never forget to free vs_iter_t
+//!     assert(vs_iter_destroy(iter) == 0);
 //!
-//!     // Create updated vsread_iter_t
-//!     vsread_iter_t * iter2 = vsread_iter(vsread);
+//!     // Create updated vs_iter_t
+//!     vs_iter_t * iter2 = vs_iter(vs);
 //!
-//!     // Never forget to free vsread_t
-//!     assert(vsread_destroy(vsread) == 0);
+//!     // Never forget to free vs_t
+//!     assert(vs_destroy(vs) == 0);
 //!
-//!     // vsread_iter_t keeps existing after the original vsread_t is freed
-//!     assert(vsread_iter_len(iter2) == 0);
-//!     assert(vsread_iter_next(iter2) == NULL);
-//!     assert(vsread_iter_index(iter2) == 0);
-//!     assert(vsread_iter_destroy(iter2) == 0);
+//!     // vs_iter_t keeps existing after the original vs_t is freed
+//!     assert(vs_iter_len(iter2) == 0);
+//!     assert(vs_iter_next(iter2) == NULL);
+//!     assert(vs_iter_index(iter2) == 0);
+//!     assert(vs_iter_destroy(iter2) == 0);
 //!
 //!     printf("Single thread example ended without errors\n");
 //!     (void) argc;
@@ -83,8 +87,8 @@
 //!
 //! int main(int argc, char** argv)
 //! {
-//!     // Rust allocates memory through malloc
-//!     vsread_t * const vsread = vsread_new();
+//!     // You are responsible for making sure 'vs' exists while accessed
+//!     vs_t * vs = vs_new();
 //!     unsigned int current_thread = 0;
 //!     pthread_attr_t attr;
 //!     pthread_t consumers[num_consumers],
@@ -97,7 +101,7 @@
 //!
 //!     // Creates producer threads
 //!     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
-//!         if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vsread) != 0) {
+//!         if (pthread_create(&producers[current_thread], &attr, &producer, (void *) vs) != 0) {
 //!             fprintf(stderr, "Failed to create producer thread %d.\n", current_thread);
 //!             exit(-2);
 //!         }
@@ -106,13 +110,13 @@
 //!
 //!     // Creates consumers threads
 //!     for (current_thread = 0; current_thread < num_consumers; ++current_thread) {
-//!         if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vsread) != 0) {
+//!         if (pthread_create(&consumers[current_thread], &attr, &consumer, (void *) vs) != 0) {
 //!             fprintf(stderr, "Failed to create consumer thread %d.\n", current_thread);
 //!             exit(-3);
 //!         }
 //!     }
 //!
-//!     // Join all threads, ensuring vsread_t* is not used anymore
+//!     // Join all threads, ensuring vs_t* is not used anymore
 //!     for (current_thread = 0; current_thread < num_producers; ++current_thread) {
 //!         pthread_join(producers[current_thread], NULL);
 //!     }
@@ -121,7 +125,7 @@
 //!     }
 //!
 //!     // Never forget to free the memory allocated through rust
-//!     assert(vsread_destroy(vsread) == 0);
+//!     assert(vs_destroy(vs) == 0);
 //!
 //!     printf("Multi thread example ended without errors\n");
 //!     (void) argc;
@@ -129,61 +133,61 @@
 //!     return 0;
 //! }
 //!
-//!
-//! void * producer(void * const vsread){
+//! void * producer(void * vs){
 //!     unsigned int index;
 //!     for (index = 0; index < num_producer_values; ++index) {
-//!         assert(vsread_append(vsread, (void *) &data[index % last_index]) == 0);
+//!         assert(vs_append(vs, (void *) &data[index % last_index]) == 0);
 //!     }
 //!     return NULL;
 //! }
 //!
-//! void * consumer(void * const vsread) {
+//! void * consumer(void * vs) {
 //!     const unsigned int total_values = num_producers * num_producer_values;
-//!     unsigned int values;
+//!     unsigned int values = 0;
 //!
 //!     while (values < total_values) {
 //!         unsigned int sum = (values = 0);
-//!         vsread_iter_t * const iter = vsread_iter(vsread);
-//!         const void * value;
+//!         vs_iter_t * iter = vs_iter(vs);
+//!         void * value;
 //!
-//!         while ((value = vsread_iter_next(iter)) != NULL) {
+//!         while ((value = vs_iter_next(iter)) != NULL) {
 //!             ++values;
 //!             sum += *(unsigned int *) value;
 //!         }
 //!         printf("Consumer counts %d elements summing %d.\n", values, sum);
 //!
-//!         assert(vsread_iter_destroy(iter) == 0);
+//!         assert(vs_iter_destroy(iter) == 0);
 //!     }
 //!     return NULL;
 //! }
 //! ```
 
-use iter::VSReadIter;
-use std::{
-    mem::drop,
-    os::raw::c_void,
-    ptr::{null, null_mut},
-};
-use vsread::VSRead;
+use iterator::VSIter;
+use std::{mem::drop, ptr::null_mut};
+use voluntary_servitude::VoluntaryServitude;
 
-/// Initialize logger according to RUST_LOG env var (only exists 'logs' feature)
-///
-/// Currently there is no warning and logging is stripped at compile time in release
+/// Enum impossible to instantiate, used as opaque pointer
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub enum c_void {}
+
+/// Initialize logger according to RUST_LOG env var (exists behind 'logs' feature)
 ///
 /// ```bash
-/// export RUST_LOG=voluntary_servitude=trace
-/// export RUST_LOG=voluntary_servitude=debug
-/// export RUST_LOG=voluntary_servitude=info
+/// export RUST_LOG=vs=trace
+/// export RUST_LOG=vs=debug
+/// export RUST_LOG=vs=info
+/// export RUST_LOG=vs=warn
+/// export RUST_LOG=vs=error
 /// ```
 ///
 /// Feature to enable it:
 ///
-///```bash
+/// ```bash
 /// cargo build --features "logs"
 /// ```
 ///
-/// ```
+/// ```rust
 /// use voluntary_servitude::ffi::*;
 /// unsafe { initialize_logger() }
 /// ```
@@ -193,20 +197,21 @@ pub unsafe extern "C" fn initialize_logger() {
     ::setup_logger();
 }
 
-/// Creates new empty VSRead (thread-safe appendable list with lock-free iterator)
+/// Creates new empty [`VoluntaryServitude`]
 ///
-/// vsread_drop should be called eventually for VSRead returned, otherwise memory will leak
+/// `vs_drop` should be called eventually for [`VoluntaryServitude`] returned, otherwise memory will leak
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
 ///
 /// # Rust
 ///
-/// ```
+/// ```rust
 /// use voluntary_servitude::ffi::*;
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///
-///     let vsread = vsread_new();
-///     assert_eq!(vsread_len(vsread), 0);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let vs = vs_new();
+///     assert_eq!(vs_len(vs), 0);
+///     assert_eq!(vs_destroy(vs), 0);
 /// }
 /// ```
 ///
@@ -217,52 +222,47 @@ pub unsafe extern "C" fn initialize_logger() {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     assert(vsread_len(vsread) == 0);
-///     assert(vsread_destroy(vsread) == 0);
+///     vs_t * vs = vs_new();
+///     assert(vs_len(vs) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
-    Box::into_raw(Box::new(vsread![]))
+pub unsafe extern "C" fn vs_new() -> *mut VoluntaryServitude<*const c_void> {
+    Box::into_raw(Box::new(vs![]))
 }
 
-/// Makes lock-free iterator based on VSRead
+/// Makes lock-free iterator based on [`VoluntaryServitude`]
 ///
-/// vsread_iter_drop should be called eventually for VSReadIter returned, otherwise memory will leak
+/// `vs_iter_drop` should be called eventually for [`VSIter`] returned, otherwise memory will leak
 ///
-/// Iterator is not thread-safe by default, you need to compile libvoluntary_servitude.so with the cargo feature "iter-sync"
+/// Returns NULL if pointer to [`VoluntaryServitude`] is NULL
 ///
-/// Returns NULL if pointer to VSRead is NULL
+/// Warning: UB if pointer to [`VoluntaryServitude`] is invalid
 ///
-/// Warning: UB if pointer to VSRead is invalid
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
+/// [`VSIter`]: ../type.VSIter.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///
-///     let iter = vsread_iter(vsread);
-///     assert!(!iter.is_null());
-///     assert!(vsread_iter_next(iter).is_null());
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///
+///     let vs = vs_new();
 ///     let data: i32 = 3;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     let iter = vsread_iter(vsread);
-///     unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 3) }
-///     assert!(vsread_iter_next(iter).is_null());
-///     assert_eq!(vsread_destroy(vsread), 0);
-///     assert_eq!(vsread_iter_destroy(iter), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_destroy(vs), 0);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 3);
+///     assert!(vs_iter_next(iter).is_null());
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
 ///     // Propagates NULL pointers
-///     assert_eq!(vsread_iter(null_mut()), null_mut());
+///     assert_eq!(vs_iter(null_mut()), null_mut());
 /// }
 /// ```
 ///
@@ -273,56 +273,55 @@ pub unsafe extern "C" fn vsread_new() -> *mut VSRead<*const c_void> {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(iter != NULL);
-///     assert(vsread_iter_next(iter) == NULL);
-///     assert(vsread_iter_destroy(iter) == 0);
-///
+///     vs_t * vs = vs_new();
+///     vs_iter_t * iter = vs_iter(vs);
 ///     const unsigned int data = 3;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     vsread_iter_t * const iter2 = vsread_iter(vsread);
-///     assert(*(unsigned int *) vsread_iter_next(iter2) == 3);
-///     assert(vsread_iter_next(iter2) == NULL);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     vs_iter_t * iter2 = vs_iter(vs);
+///     assert(vs_destroy(iter) == 0);
+///     assert(*(unsigned int *) vs_iter_next(iter2) == 3);
+///     assert(vs_iter_next(iter2) == NULL);
 ///
-///     assert(vsread_destroy(iter) == 0);
-///     assert(vsread_iter_destroy(iter2) == 0);
+///     assert(vs_iter_destroy(iter2) == 0);
 ///
 ///     // Propagates NULL pointers
-///     assert(vsread_iter(NULL) == NULL);
+///     assert(vs_iter(NULL) == NULL);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_iter<'a>(
-    vsread: *const VSRead<*const c_void>,
-) -> *mut VSReadIter<'a, *const c_void> {
-    non_null!(vsread, Box::into_raw(Box::new((&*vsread).iter())), null_mut())
+pub unsafe extern "C" fn vs_iter<'a>(
+    vs: *mut VoluntaryServitude<*const c_void>,
+) -> *mut VSIter<'a, *const c_void> {
+    null_check!(vs, null_mut());
+    Box::into_raw(Box::new((*vs).iter()))
 }
 
-/// Atomically extracts current size of VSRead, be careful with data-races when using it
+/// Atomically extracts current size of [`VoluntaryServitude`], be careful with data-races when using it
 ///
-/// Returns 0 if pointer to VSRead is NULL
+/// Returns 0 if pointer to [`VoluntaryServitude`] is NULL
 ///
-/// Warning: UB if pointer to VSRead invalid
+/// Warning: UB if pointer to [`VoluntaryServitude`] invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     assert_eq!(vsread_len(vsread), 0);
+///     let vs = vs_new();
+///     assert_eq!(vs_len(vs), 0);
 ///     let data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 1);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_len(vs), 1);
+///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // 0 length on NULL pointer
-///     assert_eq!(vsread_len(null()), 0);
+///     assert_eq!(vs_len(null_mut()), 0);
 /// }
 /// ```
 ///
@@ -333,58 +332,55 @@ pub unsafe extern "C" fn vsread_iter<'a>(
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     assert(vsread_len(vsread) == 0);
+///     vs_t * vs = vs_new();
+///     assert(vs_len(vs) == 0);
 ///
 ///     const unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 1);
-///     assert(vsread_destroy(vsread) == 0);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_len(vs) == 1);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // 0 length on NULL pointer
-///     assert(vsread_len(NULL) == 0);
+///     assert(vs_len(NULL) == 0);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize {
-    non_null!(list, (&*list).len(), 0)
+pub unsafe extern "C" fn vs_len(list: *const VoluntaryServitude<*const c_void>) -> usize {
+    null_check!(list, 0);
+    (*list).len()
 }
 
-/// Append element to VSRead, locks other writes
+/// Append element to [`VoluntaryServitude`]
 ///
-/// Returns 1 if pointer to VSRead is NULL
+/// Returns 1 if pointer to [`VoluntaryServitude`] is NULL
 ///
 /// Returns 0 otherwise
 ///
-/// Warning: UB if pointer to VSRead is invalid
+/// Warning: UB if pointer to [`VoluntaryServitude`] is invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::{null, null_mut}, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let mut data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 1);
-///
-///     let iter = vsread_iter(vsread);
-///     unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 5) }
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///
-///     let iter = vsread_iter(vsread);
-///     data = 2;
-///     unsafe { assert_eq!(*(vsread_iter_next(iter) as *const i32), 2) }
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let vs = vs_new();
+///     let data: i32 = 5;
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(vs_iter_destroy(iter), 0);
+///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert_eq!(vsread_append(null_mut(), &data as *const i32 as *const c_void), 1);
-///     assert_eq!(vsread_append(null_mut(), null()), 1);
+///     assert_eq!(vs_append(null_mut(), &data as *const i32 as *const c_void), 1);
 /// }
 /// ```
 ///
@@ -395,61 +391,59 @@ pub unsafe extern "C" fn vsread_len(list: *const VSRead<*const c_void>) -> usize
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 1);
+///     vs_t * vs = vs_new();
+///     const unsigned int data = 5;
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     vs_iter_t * iter = vs_iter(vs);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
 ///
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 5);
-///     assert(vsread_iter_destroy(iter) == 0);
-///
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     data = 2;
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 2);
-///     assert(vsread_iter_destroy(iter) == 0);
-///     assert(vsread_destroy(vsread) == 0);
+///     assert(vs_iter_destroy(iter) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert(vsread_append(NULL, (void *) &data) == 1);
-///     assert(vsread_append(NULL, NULL) == 1);
+///     assert(vs_append(NULL, (void *) &data) == 1);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_append(
-    list: *const VSRead<*const c_void>,
+pub unsafe extern "C" fn vs_append(
+    list: *mut VoluntaryServitude<*const c_void>,
     element: *const c_void,
 ) -> u8 {
-    non_null!(list, (&*list).append(element), 1);
+    null_check!(list, 1);
+    (*list).append(element);
     0
 }
 
-/// Remove all elements from list, locks other writes
+/// Removes all elements from list (preserves existing iterators)
 ///
-/// Returns 1 if pointer to VSRead is NULL
+/// Returns 1 if pointer to [`VoluntaryServitude`] is NULL
 ///
 /// Returns 0 otherwise
 ///
-/// Warning: UB if pointer to VSRead is invalid
+/// Warning: UB if pointer to [`VoluntaryServitude`] is invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let mut data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 1);
-///     assert_eq!(vsread_clear(vsread), 0);
-///     assert_eq!(vsread_len(vsread), 0);
+///     let vs = vs_new();
+///     let data: i32 = 5;
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_len(vs), 1);
+///     assert_eq!(vs_clear(vs), 0);
+///     assert_eq!(vs_len(vs), 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert_eq!(vsread_clear(null()), 1);
+///     assert_eq!(vs_clear(null_mut()), 1);
 /// }
 /// ```
 ///
@@ -460,48 +454,54 @@ pub unsafe extern "C" fn vsread_append(
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 1);
-///     assert(vsread_clear(vsread) == 0);
-///     assert(vsread_len(vsread) == 0);
+///     vs_t * vs = vs_new();
+///     const unsigned int data = 5;
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_len(vs) == 1);
+///     assert(vs_clear(vs) == 0);
+///     assert(vs_len(vs) == 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert(vsread_clear(NULL) == 1);
+///     assert(vs_clear(NULL) == 1);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 {
-    non_null!(list, (&*list).clear(), 1);
+pub unsafe extern "C" fn vs_clear(list: *mut VoluntaryServitude<*const c_void>) -> u8 {
+    null_check!(list, 1);
+    (*list).clear();
     0
 }
 
-/// Free VSRead
+/// Free [`VoluntaryServitude`] (preserves existing iterators)
 ///
-/// Returns 1 if pointer to VSRead is NULL
+/// Returns 1 if pointer to [`VoluntaryServitude`] is NULL
 ///
 /// Returns 0 otherwise
 ///
-/// Warning: UB if pointer to VSRead is invalid
+/// Warning: UB if pointer to [`VoluntaryServitude`] is invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let mut data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 1);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let vs = vs_new();
+///     let data: i32 = 5;
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_destroy(vs), 0);
+///
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert_eq!(vsread_destroy(null_mut()), 1);
+///     assert_eq!(vs_destroy(null_mut()), 1);
 /// }
 /// ```
 ///
@@ -512,54 +512,62 @@ pub unsafe extern "C" fn vsread_clear(list: *const VSRead<*const c_void>) -> u8 
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 1);
-///     assert(vsread_destroy(vsread) == 0);
+///     vs_t * vs = vs_new();
+///     vs_iter_t * iter = vs_iter(vs);
+///     const unsigned int data = 5;
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_destroy(vs) == 0);
+///
+///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
+///     assert(vs_iter_destroy(vs) == 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert(vsread_destroy(NULL) == 1);
+///     assert(vs_destroy(NULL) == 1);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) -> u8 {
-    non_null!(list, drop(Box::from_raw(list)), 1);
+pub unsafe extern "C" fn vs_destroy(list: *mut VoluntaryServitude<*const c_void>) -> u8 {
+    null_check!(list, 1);
+    drop(Box::from_raw(list));
     0
 }
 
-/// Obtain next element in iter, returns NULL if there are no more elements
+/// Obtains next element in iterator, returns NULL if there are no more elements
 ///
-/// Returns NULL if pointer to VSReadIter is NULL
+/// Returns NULL if pointer to [`VSIter`] is NULL
 ///
-/// Warning: UB if pointer to VSReadIter is invalid
+/// Warning: UB if pointer to [`VSIter`] is invalid
+///
+/// [`VSIter`]: ../struct.VSIter.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let mut data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///     let vs = vs_new();
+///     let data: i32 = 5;
 ///
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(*(vsread_iter_next(iter) as *const i32), 5);
-///     assert!(vsread_iter_next(iter).is_null());
-///     assert_eq!(vsread_iter_destroy(iter), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert!(vs_iter_next(iter).is_null());
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
-///     let iter = vsread_iter(vsread);
-///     data = 2;
-///     assert_eq!(*(vsread_iter_next(iter) as *const i32), 2);
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert!(vs_iter_next(iter).is_null());
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert!(vs_iter_next(iter).is_null());
+///
+///     assert_eq!(vs_iter_destroy(iter), 0);
+///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // Propagates NULL pointers
-///     assert!(vsread_iter_next(null_mut()).is_null());
+///     assert!(vs_iter_next(null_mut()).is_null());
 /// }
 /// ```
 ///
@@ -570,78 +578,83 @@ pub unsafe extern "C" fn vsread_destroy(list: *mut VSRead<*const c_void>) -> u8 
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
+///     vs_t * vs = vs_new();
+///     vs_iter_t * iter = vs_iter(vs);
+///     const unsigned int data = 5;
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_iter_next(iter) == NULL);
 ///
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 5);
-///     assert(vsread_iter_next(iter) == NULL);
-///     assert(vsread_iter_destroy(iter) == 0);
+///     assert(vs_iter_destroy(iter) == 0);
+///     iter = vs_iter(vs);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
+///     assert(vs_iter_next(iter) == NULL);
+///     assert(vs_append(vs, (void *) &data) == 0);
 ///
-///     vsread_iter_t * const iter2 = vsread_iter(vsread);
-///     data = 2;
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 2);
-///     assert(vsread_iter_destroy(iter) == 0);
-///     assert(vsread_destroy(vsread) == 0);
+///     assert(vs_iter_next(iter) == NULL);
+///     assert(vs_iter_destroy(iter) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // Propagates NULL pointers
-///     assert(vsread_iter_next(NULL) == NULL);
+///     assert(vs_iter_next(NULL) == NULL);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_iter_next(
-    iter: *mut VSReadIter<'_, *const c_void>,
-) -> *const c_void {
-    let iter = non_null!(iter, &mut *iter, null());
-    match iter.next() {
+pub unsafe extern "C" fn vs_iter_next(iter: *mut VSIter<'_, *const c_void>) -> *const c_void {
+    null_check!(iter, null_mut());
+    match (*iter).next() {
         Some(pointer) => *pointer,
-        None => null(),
+        None => null_mut(),
     }
 }
 
-/// Returns total size of iterator, this may grow, but never decrease
+/// Returns total size of iterator, it may grow, but never decrease
 ///
-/// If iterator length was 0 during creating it will never increase because the chain is not there, you must create another
+/// Length won't increase after iterator is emptied (self.next() == None)
 ///
-/// Returns 0 if pointer to VSReadIter is NULL
+/// Returns 0 if pointer to [`VSIter`] is NULL
 ///
-/// Warning: UB if pointer to VSReadIter is invalid
+/// Warning: UB if pointer to [`VSIter`] is invalid
+///
+/// [`VSIter`]: ../struct.VSIter.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let mut data: i32 = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///     let vs = vs_new();
+///     let data: i32 = 5;
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_len(vs), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_len(vsread), 1);
-///     assert_eq!(vsread_iter_len(iter), 1);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_len(vs), 1);
+///     assert_eq!(vs_iter_len(iter), 1);
 ///
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_len(vsread), 4);
-///     assert_eq!(vsread_iter_len(iter), 4);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_len(vs), 4);
+///     assert_eq!(vs_iter_len(iter), 4);
 ///
-///     assert_eq!(vsread_clear(vsread), 0);
-///     assert_eq!(vsread_iter_len(iter), 4);
-///     assert_eq!(vsread_iter_destroy(iter), 0);
+///     assert_eq!(vs_clear(vs), 0);
+///     assert_eq!(vs_iter_len(iter), 4);
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_iter_len(iter), 0);
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_iter_len(iter), 0);
+///
+///     assert_eq!(vs_iter_destroy(iter), 0);
+///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // 0 length on NULL pointer
-///     assert_eq!(vsread_iter_len(null_mut()), 0);
+///     assert_eq!(vs_iter_len(null_mut()), 0);
 /// }
 /// ```
 ///
@@ -652,78 +665,78 @@ pub unsafe extern "C" fn vsread_iter_next(
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
+///     vs_t * vs = vs_new();
 ///     const unsigned int data = 5;
-///     assert_eq!(vsread_append(vsread, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
 ///
-///     assert(vsread_len(vsread) == 1);
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(vsread_iter_len(iter) == 1);
+///     assert(vs_len(vs) == 1);
+///     vs_iter_t * iter = vs_iter(vs);
+///     assert(vs_iter_len(iter) == 1);
 ///
 ///     const unsigned int data = 5;
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_append(vsread, (void *) &data) == 0);
-///     assert(vsread_len(vsread) == 4);
-///     assert(vsread_iter_len(iter) == 4);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_len(vs) == 4);
+///     assert(vs_iter_len(iter) == 4);
 ///
-///     assert(vsread_clear() == 0);
-///     assert(vsread_iter_len(iter) == 4);
+///     assert(vs_clear() == 0);
+///     assert(vs_iter_len(iter) == 4);
 ///
-///     assert(vsread_iter_destroy(iter) == 0);
+///     assert(vs_iter_destroy(iter) == 0);
 ///
-///     vsread_iter_t * const iter2 = vsread_iter(vsread);
-///     assert(vsread_iter_len(iter2) == 0);
-///     assert(vsread_iter_destroy(iter2) == 0);
-///     assert(vsread_destroy(vsread) == 0);
+///     vs_iter_t * iter2 = vs_iter(vs);
+///     assert(vs_iter_len(iter2) == 0);
+///     assert(vs_iter_destroy(iter2) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // 0 length on NULL pointer
-///     assert(vsread_iter_len(NULL) == 0);
+///     assert(vs_iter_len(NULL) == 0);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_void>) -> usize {
-    non_null!(iter, (&*iter).len(), 0)
+pub unsafe extern "C" fn vs_iter_len(iter: *const VSIter<'_, *const c_void>) -> usize {
+    null_check!(iter, 0);
+    (*iter).len()
 }
 
 /// Returns current iterator index
 ///
-/// Returns 0 if pointer to VSReadIter is NULL
+/// Returns 0 if pointer to [`VSIter`] is NULL
 ///
-/// Warning: UB if pointer to VSReadIter is invalid
+/// Warning: UB if pointer to [`VSIter`] is invalid
+///
+/// [`VSIter`]: ../struct.VSIter.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
+///     let vs = vs_new();
 ///     let data: [i32; 3] = [4, 9, 8];
-///     assert_eq!(vsread_append(vsread, &data[0] as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data[1] as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data[2] as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data[0] as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data[1] as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, &data[2] as *const i32 as *const c_void), 0);
 ///
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_iter_index(iter), 0);
-///     assert_eq!(*(vsread_iter_next(iter) as *const i32), 4);
-///     assert_eq!(vsread_iter_index(iter), 1);
-///     assert_eq!(*(vsread_iter_next(iter) as *const i32), 9);
-///     assert_eq!(vsread_iter_index(iter), 2);
-///     assert_eq!(*(vsread_iter_next(iter) as *const i32), 8);
-///     assert_eq!(vsread_iter_index(iter), 3);
-///     assert!(vsread_iter_next(iter).is_null());
-///     assert_eq!(vsread_iter_index(iter), 3);
-///     assert_eq!(vsread_iter_index(iter), vsread_iter_len(iter));
-///     assert_eq!(vsread_iter_destroy(iter), 0);
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_iter_index(iter), 0);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 4);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 9);
+///     assert_eq!(*(vs_iter_next(iter) as *const i32), 8);
+///     assert_eq!(vs_iter_index(iter), 3);
+///     assert!(vs_iter_next(iter).is_null());
+///     assert_eq!(vs_iter_index(iter), vs_iter_len(iter));
 ///
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     assert_eq!(vs_iter_destroy(iter), 0);
+///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // 0 index on NULL pointer
-///     assert_eq!(vsread_iter_index(null_mut()), 0);
+///     assert_eq!(vs_iter_index(null_mut()), 0);
 /// }
 /// ```
 ///
@@ -734,68 +747,61 @@ pub unsafe extern "C" fn vsread_iter_len(iter: *const VSReadIter<'_, *const c_vo
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data[3] = { 4, 9, 8 };
-///     assert(vsread_append(vsread, (void *) data) == 0);
-///     assert(vsread_append(vsread, (void *) (data + 1)) == 0);
-///     assert(vsread_append(vsread, (void *) (data + 2)) == 0);
+///     vs_t * vs = vs_new();
+///     const unsigned int data[3] = { 4, 9, 8 };
+///     assert(vs_append(vs, (void *) data) == 0);
+///     assert(vs_append(vs, (void *) (data + 1)) == 0);
+///     assert(vs_append(vs, (void *) (data + 2)) == 0);
 ///
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(vsread_iter_index(iter) == 0);
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 4);
-///     assert(vsread_iter_index(iter) == 1);
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 9);
-///     assert(vsread_iter_index(iter) == 2);
-///     assert(*(unsigned int *) vsread_iter_next(iter) == 8);
-///     assert(vsread_iter_index(iter) == 3);
+///     vs_iter_t * iter = vs_iter(vs);
+///     assert(vs_iter_index(iter) == 0);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 4);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 9);
+///     assert(*(unsigned int *) vs_iter_next(iter) == 8);
+///     assert(vs_iter_index(iter) == 3);
+///     assert(vs_iter_next(iter) == NULL);
+///     assert(vs_iter_index(iter) == vs_iter_len(iter));
 ///
-///     assert(vsread_iter_next(iter) == NULL);
-///     assert(vsread_iter_index(iter) == 3);
-///     assert(vsread_iter_index(iter) == vsread_iter_len(iter));
-///     assert(vsread_iter_destroy(iter) == 0);
-///
-///     assert(vsread_destroy(vsread) == 0);
+///     assert(vs_iter_destroy(iter) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // 0 index on NULL pointer
-///     assert(vsread_iter_index(NULL) == 0);
+///     assert(vs_iter_index(NULL) == 0);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_void>) -> usize {
-    non_null!(iter, (&*iter).index(), 0)
+pub unsafe extern "C" fn vs_iter_index(iter: *const VSIter<'_, *const c_void>) -> usize {
+    null_check!(iter, 0);
+    (*iter).index()
 }
 
-/// Free VSReadIter
+/// Free [`VSIter`] (can happen after [`VoluntaryServitude`]'s free)
 ///
-/// Returns 1 if pointer to VSRead is NULL
+/// Returns 1 if pointer to [`VoluntaryServitude`] is NULL
 ///
 /// Returns 0 otherwise
 ///
-/// Warning: UB if pointer to VSReadIter is invalid
+/// Warning: UB if pointer to [`VSIter`] is invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
+/// [`VSIter`]: ../struct.VSIter.html
 ///
 /// # Rust
 ///
-/// ```
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// ```rust
+/// use std::ptr::null_mut;
 /// use voluntary_servitude::ffi::*;
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vsread = vsread_new();
-///     let data: [i32; 3] = [4, 9, 8];
-///     assert_eq!(vsread_append(vsread, &data[0] as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data[1] as *const i32 as *const c_void), 0);
-///     assert_eq!(vsread_append(vsread, &data[2] as *const i32 as *const c_void), 0);
-///
-///     let iter = vsread_iter(vsread);
-///     assert_eq!(vsread_iter_len(iter), 3);
-///     assert_eq!(vsread_iter_destroy(iter), 0);
-///
-///     assert_eq!(vsread_destroy(vsread), 0);
+///     let vs = vs_new();
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_destroy(vs), 0);
+///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert_eq!(vsread_iter_destroy(null_mut()), 1);
+///     assert_eq!(vs_iter_destroy(null_mut()), 1);
 /// }
 /// ```
 ///
@@ -806,25 +812,26 @@ pub unsafe extern "C" fn vsread_iter_index(iter: *const VSReadIter<'_, *const c_
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vsread_t * const vsread = vsread_new();
-///     unsigned int data[3] = { 4, 9, 8 };
-///     assert(vsread_append(vsread, (void *) data) == 0);
-///     assert(vsread_append(vsread, (void *) (data + 1)) == 0);
-///     assert(vsread_append(vsread, (void *) (data + 2)) == 0);
+///     vs_t * vs = vs_new();
+///     const unsigned int data[3] = { 4, 9, 8 };
+///     assert(vs_append(vs, (void *) data) == 0);
+///     assert(vs_append(vs, (void *) (data + 1)) == 0);
+///     assert(vs_append(vs, (void *) (data + 2)) == 0);
 ///
-///     vsread_iter_t * const iter = vsread_iter(vsread);
-///     assert(vsread_iter_len(iter) == 3);
-///     assert(vsread_iter_destry(iter) == 0);
+///     vs_iter_t * iter = vs_iter(vs);
+///     assert(vs_iter_len(iter) == 3);
+///     assert(vs_iter_destry(iter) == 0);
 ///
-///     assert(vsread_destroy(vsread) == 0);
+///     assert(vs_destroy(vs) == 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert(vsread_iter_destroy(NULL) == 1);
+///     assert(vs_iter_destroy(NULL) == 1);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vsread_iter_destroy(iter: *mut VSReadIter<'_, *const c_void>) -> u8 {
-    non_null!(iter, drop(Box::from_raw(iter)), 1);
+pub unsafe extern "C" fn vs_iter_destroy(iter: *mut VSIter<'_, *const c_void>) -> u8 {
+    null_check!(iter, 1);
+    drop(Box::from_raw(iter));
     0
 }

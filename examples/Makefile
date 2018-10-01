@@ -3,15 +3,12 @@ FLAGS=-Wall -Wextra -Wpedantic
 
 default: all
 
-all: multithread.c ffi.c $(LIBDIR)/libvoluntary_servitude.so
-	$(CC) $(FLAGS) ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
-	$(CC) $(FLAGS) multithread.c -L$(LIBDIR) -lpthread -lvoluntary_servitude -o multithread
-
-
-$(LIBDIR)/libvoluntary_servitude.so:
-	cargo build --release
+all:
+	cargo build --release --features "system-alloc"
 	cp ../target/release/libvoluntary_servitude.so $(LIBDIR)
 	strip $(LIBDIR)/libvoluntary_servitude.so
+	$(CC) $(FLAGS) ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
+	$(CC) $(FLAGS) multithread.c -L$(LIBDIR) -lpthread -lvoluntary_servitude -o multithread
 
 test:
 	make
