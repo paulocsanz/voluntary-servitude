@@ -11,7 +11,7 @@
 //! ```c
 //! #include<assert.h>
 //! #include<stdio.h>
-//! #include "include/voluntary_servitude.h"
+//! #include "../include/voluntary_servitude.h"
 //!
 //! int main(int argc, char **argv) {
 //!     // You are responsible for making sure 'vs' exists while accessed
@@ -28,8 +28,6 @@
 //!
 //!     // Creates a one-time lock-free iterator based on vs_t
 //!     vs_iter_t * iter = vs_iter(vs);
-//!     // Index changes as you iter through vs_iter_t
-//!     assert(vs_iter_index(iter) == 0);
 //!
 //!     // Clearing vs_t, doesn't change existing iterators
 //!     vs_clear(vs);
@@ -37,13 +35,16 @@
 //!     assert(vs_iter_len(iter) == 2);
 //!
 //!     assert(*(unsigned int *) vs_iter_next(iter) == 12);
+//!     // Index changes as you iter through vs_iter_t
 //!     assert(vs_iter_index(iter) == 1);
 //!     assert(*(unsigned int *) vs_iter_next(iter) == 25);
 //!     assert(vs_iter_index(iter) == 2);
 //!
 //!     assert(vs_iter_next(iter) == NULL);
 //!     assert(vs_iter_index(iter) == 2);
-//!     assert(vs_iter_len(iter) == 2);
+//!     // Index doesn't increase after it gets equal to 'len'
+//!     // Length also is unable to increase after iterator is consumed
+//!     assert(vs_iter_index(iter) == vs_iter_len(iter));
 //!
 //!     // Never forget to free vs_iter_t
 //!     assert(vs_iter_destroy(iter) == 0);
@@ -54,10 +55,11 @@
 //!     // Never forget to free vs_t
 //!     assert(vs_destroy(vs) == 0);
 //!
-//!     // vs_iter_t keeps existing after the original vs_t is freed
+//!     // vs_iter_t keeps existing after the original vs_t is freed (or cleared)
 //!     assert(vs_iter_len(iter2) == 0);
 //!     assert(vs_iter_next(iter2) == NULL);
 //!     assert(vs_iter_index(iter2) == 0);
+//!
 //!     assert(vs_iter_destroy(iter2) == 0);
 //!
 //!     printf("Single thread example ended without errors\n");
@@ -85,10 +87,10 @@
 //! void * producer();
 //! void * consumer();
 //!
-//! int main(int argc, char** argv)
-//! {
-//!     // You are responsible for making sure 'vs' exists while accessed
-//!     vs_t * vs = vs_new();
+//! int main(int argc, char** argv) {
+//!     // You are responsible for making sure 'vs' exists
+//!     // while the producers and consumers do
+//!     vs_t * const vs = vs_new();
 //!     unsigned int current_thread = 0;
 //!     pthread_attr_t attr;
 //!     pthread_t consumers[num_consumers],
@@ -133,7 +135,8 @@
 //!     return 0;
 //! }
 //!
-//! void * producer(void * vs){
+//!
+//! void * producer(void * const vs){
 //!     unsigned int index;
 //!     for (index = 0; index < num_producer_values; ++index) {
 //!         assert(vs_append(vs, (void *) &data[index % last_index]) == 0);
@@ -141,14 +144,14 @@
 //!     return NULL;
 //! }
 //!
-//! void * consumer(void * vs) {
+//! void * consumer(void * const vs) {
 //!     const unsigned int total_values = num_producers * num_producer_values;
-//!     unsigned int values = 0;
+//!     unsigned int values;
 //!
 //!     while (values < total_values) {
 //!         unsigned int sum = (values = 0);
-//!         vs_iter_t * iter = vs_iter(vs);
-//!         void * value;
+//!         vs_iter_t * const iter = vs_iter(vs);
+//!         const void * value;
 //!
 //!         while ((value = vs_iter_next(iter)) != NULL) {
 //!             ++values;
@@ -164,12 +167,8 @@
 
 use iterator::VSIter;
 use std::{mem::drop, ptr::null_mut};
+pub use std::os::raw::c_void;
 use voluntary_servitude::VoluntaryServitude;
-
-/// Enum impossible to instantiate, used as opaque pointer
-#[derive(Debug)]
-#[allow(non_camel_case_types)]
-pub enum c_void {}
 
 /// Initialize logger according to RUST_LOG env var (exists behind 'logs' feature)
 ///

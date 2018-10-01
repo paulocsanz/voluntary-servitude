@@ -1,9 +1,6 @@
 extern crate voluntary_servitude;
 use std::ptr::null_mut;
-use voluntary_servitude::ffi::{
-    c_void, vs_append, vs_clear, vs_destroy, vs_iter, vs_iter_destroy, vs_iter_index, vs_iter_len,
-    vs_iter_next, vs_len, vs_new,
-};
+use voluntary_servitude::ffi::*;
 
 fn initialize_logger() {
     #[cfg(feature = "logs")]

@@ -6,7 +6,7 @@ description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-keywords = ["lock-free", "data-structure", "iterator", "appendable", "list", "thread-safe"]
+keywords = ["lock-free", "data-structure", "iterator", "vector", "thread-safe"]
 categories = ["concurrency", "data-structures"]
 
 [package.metadata.docs.rs]

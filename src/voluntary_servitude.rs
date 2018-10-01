@@ -1,6 +1,6 @@
 //! Lock-free appendable list
 
-use iterator::{PrivateConstructor, VSIter};
+use iterator::{CrateConstructor, VSIter};
 use node::Node;
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::{fmt, fmt::Debug, fmt::Formatter, iter::FromIterator, ptr::null_mut};
@@ -43,6 +43,7 @@ impl<T> VSInner<T> {
     }
 
     /// Decreases references count (drop all nodes if it's the last reference)
+    #[inline]
     pub fn drop_ref(&self) {
         info!("Decreasing references counter, drop all nodes if it's the last reference");
         if self.copies.fetch_sub(1, Ordering::SeqCst) == 1 {
@@ -181,7 +182,7 @@ impl<'a, T: 'a + Copy> FromIterator<&'a T> for VoluntaryServitude<T> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
         trace!("VoluntaryServitude<T> from IntoIterator<&'a T> where T: Copy");
-        VS::from_iter(iter.into_iter().map(|v| *v))
+        VS::from_iter(iter.into_iter().cloned())
     }
 }
 
@@ -198,7 +199,7 @@ impl<T: PartialEq> PartialEq for VoluntaryServitude<T> {
     fn eq(&self, other: &Self) -> bool {
         trace!("PartialEq VoluntaryServitude");
         let len = self.len();
-        if len == 0 && other.len() == 0 {
+        if len == 0 && other.is_empty() {
             return true;
         };
         self.iter()

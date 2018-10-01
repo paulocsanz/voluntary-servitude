@@ -1,49 +1,34 @@
 #[macro_use]
 extern crate voluntary_servitude;
 
-const ELEMENTS: usize = 10000;
-
 fn main() {
-    // VS alias to VoluntaryServitude
-    // vs! alias to voluntary_servitude! (and operate like vec!)
-    let list = vs![0, 1, 2];
+    let (a, b, c) = (0usize, 1usize, 2usize);
+	// VS alias to VoluntaryServitude
+	// vs! alias to voluntary_servitude! (and operate like vec!)
+	let list = vs![a, b, c];
+	assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 
-    // Current VS's length
-    // Be careful with data-races since the value, when used, may not be true anymore
-    assert_eq!(list.len(), 3);
+	// Current VS's length
+	// Be careful with data-races since the value, when used, may not be true anymore
+	assert_eq!(list.len(), 3);
 
-    // The 'iter' method makes a one-time lock-free iterator (VSIter)
-    assert_eq!(list.iter().len(), 3);
+	// The 'iter' method makes a one-time lock-free iterator (VSIter)
+	for (index, element) in list.iter().enumerate() {
+		assert_eq!(index, *element);
+	}
 
-    // You can get the current iteration index
-    // iter.next() == iter.le() means iteration ended (iter.next() == None)
-    let mut iter = list.iter();
-    assert_eq!(iter.index(), 0);
-    assert_eq!(iter.next(), Some(&0));
-    assert_eq!(iter.index(), 1);
+	// You can get the current iteration index
+	// iter.next() == iter.len() means iteration ended (iter.next() == None)
+	let mut iter = list.iter();
+	assert_eq!(iter.index(), 0);
+	assert_eq!(iter.next(), Some(&0));
+	assert_eq!(iter.index(), 1);
 
-    // Appends 9997 elements to it
-    assert_eq!((3..ELEMENTS).map(|i| list.append(i)).count(), ELEMENTS - 3);
+	// List can also be cleared (but current iterators are not affected)
+	list.clear();
 
-    // Iterates through all elements to ensure it's what we inserted
-    let count = list
-        .iter()
-        .enumerate()
-        .map(|(i, el)| assert_eq!(&i, el))
-        .count();
-    assert_eq!(count, ELEMENTS);
-
-    let iter2 = list.iter();
-
-    // List can also be cleared (but current iterators are not affected)
-    list.clear();
-
-    assert_eq!(list.len(), 0);
-    assert_eq!(list.iter().len(), 0);
-    assert_eq!(list.iter().next(), None);
-    assert_eq!(iter2.len(), ELEMENTS);
-    let count = iter2.enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
-    assert_eq!(count, ELEMENTS);
-
-    println!("Single thread example ended without errors");
+	assert_eq!(iter.len(), 3);
+	assert_eq!(list.len(), 0);
+	assert_eq!(list.iter().len(), 0);
+	assert_eq!(list.iter().next(), None);
 }

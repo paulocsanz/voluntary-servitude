@@ -9,7 +9,9 @@ use std::{hash::Hash, hash::Hasher, ptr::null_mut, ptr::NonNull};
 use std::{hint::unreachable_unchecked, marker::PhantomData};
 use voluntary_servitude::VSInner;
 
-pub trait PrivateConstructor<T> {
+/// Trait that ensures constructor is not available to this crate's users
+pub trait CrateConstructor<T> {
+    /// VSIter constructor that is only available to this crate
     fn new(inner: &mut VSInner<T>) -> Self;
 }
 
@@ -30,7 +32,7 @@ pub struct VSIter<'a, T: 'a> {
     data: PhantomData<&'a T>,
 }
 
-impl<'a, T> PrivateConstructor<T> for VSIter<'a, T> {
+impl<'a, T> CrateConstructor<T> for VSIter<'a, T> {
     /// Creates a new lock-free iterator based on [`VSInner`]
     ///
     /// [`VSInner`]: ./struct.VSInner.html
@@ -65,7 +67,7 @@ impl<'a, T> Clone for VSIter<'a, T> {
         let inner = unsafe {
             self.inner
                 .map(|mut nn| nn.as_mut().create_ref())
-                .or(Some(null_mut()))
+                .or_else(|| Some(null_mut()))
                 .unwrap_or_else(|| unreachable_unchecked())
         };
         VSIter {
@@ -162,7 +164,7 @@ impl<'a, T> VSIter<'a, T> {
         self.inner()
             .filter(|_| self.current.is_some())
             .map(|inner| inner.len())
-            .or(Some(self.index))
+            .or_else(|| Some(self.index))
             .unwrap_or_else(|| unsafe { unreachable_unchecked() })
     }
 

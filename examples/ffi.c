@@ -17,8 +17,6 @@ int main(int argc, char **argv) {
 
     // Creates a one-time lock-free iterator based on vs_t
     vs_iter_t * iter = vs_iter(vs);
-    // Index changes as you iter through vs_iter_t
-    assert(vs_iter_index(iter) == 0);
 
     // Clearing vs_t, doesn't change existing iterators
     vs_clear(vs);
@@ -26,13 +24,16 @@ int main(int argc, char **argv) {
     assert(vs_iter_len(iter) == 2);
 
     assert(*(unsigned int *) vs_iter_next(iter) == 12);
+    // Index changes as you iter through vs_iter_t
     assert(vs_iter_index(iter) == 1);
     assert(*(unsigned int *) vs_iter_next(iter) == 25);
     assert(vs_iter_index(iter) == 2);
 
     assert(vs_iter_next(iter) == NULL);
     assert(vs_iter_index(iter) == 2);
-    assert(vs_iter_len(iter) == 2);
+	// Index doesn't increase after it gets equal to 'len'
+	// Length also is unable to increase after iterator is consumed
+    assert(vs_iter_index(iter) == vs_iter_len(iter));
 
     // Never forget to free vs_iter_t
     assert(vs_iter_destroy(iter) == 0);
@@ -43,10 +44,11 @@ int main(int argc, char **argv) {
     // Never forget to free vs_t
     assert(vs_destroy(vs) == 0);
 
-    // vs_iter_t keeps existing after the original vs_t is freed
+    // vs_iter_t keeps existing after the original vs_t is freed (or cleared)
     assert(vs_iter_len(iter2) == 0);
     assert(vs_iter_next(iter2) == NULL);
     assert(vs_iter_index(iter2) == 0);
+
     assert(vs_iter_destroy(iter2) == 0);
 
     printf("Single thread example ended without errors\n");

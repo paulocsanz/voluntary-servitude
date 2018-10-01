@@ -7,7 +7,7 @@ const PRODUCERS: usize = 4;
 const ELEMENTS: usize = 10000;
 
 fn main() {
-    let list = Arc::new(voluntary_servitude![]);
+    let list = Arc::new(vs![]);
     let mut handlers = vec![];
 
     // Creates producer threads to insert 10k elements
@@ -18,16 +18,18 @@ fn main() {
         }));
     }
 
-    // Creates consumer threads to print number of elements until all of them are inserted
+    // Creates consumer threads to print number of elements
+    // Until all of them are inserted
     for _ in 0..CONSUMERS {
+        const TOTAL: usize = PRODUCERS * ELEMENTS;
         let consumer = Arc::clone(&list);
-        handlers.push(spawn(move || loop {
+        handlers.push(spawn(move || while {
             let count = consumer.iter().count();
             println!("{} elements", count);
-            if count == PRODUCERS * ELEMENTS {
-                break;
-            }
-        }));
+            // This is just a do-while for demonstration purposes
+            // Don't take it very seriously
+            count < TOTAL
+        } {}));
     }
 
     // Join threads

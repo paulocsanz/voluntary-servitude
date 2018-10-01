@@ -8,10 +8,6 @@
 //!  - [`Serde serialization ('serde-traits' feature)`]
 //!  - [`Call this code from C (FFI)`] (also in **./examples**)
 //!  - System Allocator ('system-alloc' feature)
-//!    ```bash
-//!    cargo build --release --features "system-alloc"
-//!    ```
-//!    *./dist/libvoluntary_servitude.so (FFI) is compiled with system allocator*
 //!  - [`Logging ('logs' feature)`]
 //!
 //! [`Lock-free thread-safe appendable list`]: #multi-producer-multi-consumer
@@ -26,43 +22,35 @@
 //! # #[macro_use] extern crate voluntary_servitude;
 //! # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 //!
-//! const ELEMENTS: usize = 10000;
+//! let (a, b, c) = (0usize, 1usize, 2usize);
 //! // VS alias to VoluntaryServitude
 //! // vs! alias to voluntary_servitude! (and operate like vec!)
-//! let list = vs![0, 1, 2];
+//! let list = vs![a, b, c];
+//! assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 //!
 //! // Current VS's length
 //! // Be careful with data-races since the value, when used, may not be true anymore
 //! assert_eq!(list.len(), 3);
 //!
 //! // The 'iter' method makes a one-time lock-free iterator (VSIter)
-//! assert_eq!(list.iter().len(), 3);
+//! for (index, element) in list.iter().enumerate() {
+//!     assert_eq!(index, *element);
+//! }
 //!
 //! // You can get the current iteration index
-//! // iter.next() == iter.le() means iteration ended (iter.next() == None)
+//! // iter.next() == iter.len() means iteration ended (iter.next() == None)
 //! let mut iter = list.iter();
 //! assert_eq!(iter.index(), 0);
 //! assert_eq!(iter.next(), Some(&0));
 //! assert_eq!(iter.index(), 1);
 //!
-//! // Appends 9997 elements to it
-//! assert_eq!((3..ELEMENTS).map(|i| list.append(i)).count(), ELEMENTS - 3);
-//!
-//! // Iterates through all elements to ensure it's what we inserted
-//! let count = list.iter().enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
-//! assert_eq!(count, ELEMENTS);
-//!
-//! let iter2 = list.iter();
-//!
 //! // List can also be cleared (but current iterators are not affected)
 //! list.clear();
 //!
+//! assert_eq!(iter.len(), 3);
 //! assert_eq!(list.len(), 0);
 //! assert_eq!(list.iter().len(), 0);
 //! assert_eq!(list.iter().next(), None);
-//! assert_eq!(iter2.len(), ELEMENTS);
-//! let count = iter2.enumerate().map(|(i, el)| assert_eq!(&i, el)).count();
-//! assert_eq!(count, ELEMENTS);
 //!
 //! println!("Single thread example ended without errors");
 //! ```
@@ -148,7 +136,16 @@ use std::alloc::System;
 #[cfg(feature = "system-alloc")]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "system-alloc")))]
 #[global_allocator]
-/// Represents the use of the system allocator instead of rust's default
+/// Represents the use of the system's allocator instead of rust's default
+///
+/// By default is disabled, but can be enabled with the 'system-alloc' feature
+/// It's intended to be used by the FFI, but you can use it in rust by setting in Cargo.toml
+///
+/// ```bash
+/// cargo build --release --features "system-alloc"
+/// ```
+///
+/// *./dist/libvoluntary_servitude.so (FFI) is compiled with system allocator*
 pub static GLOBAL_ALLOC: System = System;
 
 #[macro_use]
@@ -157,7 +154,7 @@ extern crate log;
 #[cfg(feature = "logs")]
 extern crate env_logger;
 
-/// Setup logger according to RUST_LOG env var (must enable "logs" feature)
+/// Setup logger according to `RUST_LOG` env var (must enable "logs" feature)
 ///
 /// *During tests log to stdout to supress output on passes*
 ///
@@ -169,7 +166,7 @@ extern crate env_logger;
 /// voluntary_servitude = { version = "3", features = "logs" }
 /// ```
 ///
-/// # Set the RUST_LOG env var:
+/// # Set the `RUST_LOG` env var:
 /// ```bash
 /// export RUST_LOG=voluntary_servitude=trace
 /// export RUST_LOG=voluntary_servitude=debug
@@ -179,13 +176,14 @@ extern crate env_logger;
 /// ```
 ///
 /// ```rust
-/// // Must enable the "logs" feature and set the appropriate RUST_LOG env var
+/// // Must enable the "logs" feature and set the appropriate `RUST_LOG` env var
 /// voluntary_servitude::setup_logger();
 /// // Call code to be logged
 /// // ...
 /// ```
 #[cfg(feature = "logs")]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "logs")))]
+#[inline]
 pub fn setup_logger() {
     static STARTED: std::sync::Once = std::sync::ONCE_INIT;
     #[cfg(not(test))]
@@ -207,7 +205,7 @@ pub fn setup_logger() {
 #[cfg(not(feature = "logs"))]
 #[doc(hidden)]
 #[derive(Debug)]
-pub enum Unreachable {}
+pub enum ImpossibleToInstantiate {}
 
 /// Logging is not enabled, it's available behind "logs" feature flag
 ///
@@ -225,7 +223,7 @@ pub enum Unreachable {}
 /// cargo doc --all-features --open
 /// ```
 ///
-/// # Set the RUST_LOG env var:
+/// # Set the `RUST_LOG` env var:
 /// ```bash
 /// export RUST_LOG=voluntary_servitude=trace
 /// export RUST_LOG=voluntary_servitude=debug
@@ -235,13 +233,14 @@ pub enum Unreachable {}
 /// ```
 ///
 /// ```rust
-/// // Must enable the "logs" feature and set the appropriate RUST_LOG env var
+/// // Must enable the "logs" feature and set the appropriate `RUST_LOG` env var
 /// voluntary_servitude::setup_logger();
 /// // Call code to be logged
 /// // ...
 /// ```
 #[cfg(not(feature = "logs"))]
-pub fn setup_logger(_: Unreachable) {}
+#[inline]
+pub fn setup_logger(_: ImpossibleToInstantiate) {}
 
 /// Remove logging macros when they are disabled (at compile time)
 #[macro_use]
