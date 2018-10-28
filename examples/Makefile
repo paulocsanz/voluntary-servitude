@@ -12,8 +12,8 @@ all:
 
 test:
 	make
-	cargo run --example singlethread
-	cargo run --example multithread
+	cargo run --example singlethread --release
+	cargo run --example multithread --release
 	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./ffi
 	LD_LIBRARY_PATH=$(LIBDIR):$LD_LIBRARY_PATH ./multithread
 

@@ -17,7 +17,7 @@ void * consumer(void *);
 int main(int argc, char** argv) {
     // You are responsible for making sure 'vs' exists while accessed
     vs_t * vs = vs_new();
-	uint8_t thread = 0;
+    uint8_t thread = 0;
     pthread_attr_t attr;
     pthread_t consumers[num_consumers],
               producers[num_producers];
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
         pthread_join(consumers[thread], NULL);
     }
 
-    // Never forget to free the memory allocated through rust
+    // Never forget to free the memory allocated through the lib
     assert(vs_destroy(vs) == 0);
 
     printf("Multi thread example ended without errors\n");
@@ -84,6 +84,7 @@ void * consumer(void * vs) {
         }
         printf("Consumer counts %d elements summing %d.\n", values, sum);
 
+        // Never forget to free the memory allocated through the lib
         assert(vs_iter_destroy(iter) == 0);
     }
     return NULL;

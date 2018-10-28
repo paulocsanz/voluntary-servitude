@@ -1,5 +1,5 @@
 extern crate voluntary_servitude;
-use std::ptr::null_mut;
+use std::{os::raw::c_void, ptr::null_mut};
 use voluntary_servitude::ffi::*;
 
 fn initialize_logger() {

@@ -1,37 +1,32 @@
-//! Serde's Serialize/Deserialize trait implementations behind the 'serde-traits' feature
-//!
-//! # Serialize
-//!  - [`VoluntaryServitude`]
-//!  - [`VSIter`]
-//!
-//! # Deserialize
-//!  - [`VoluntaryServitude`]
+//! Serde's `Serialize`/`Deserialize` trait implementations for [`VoluntaryServitude`] behind the `serde-traits` feature
 //!
 //! [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html#implementations
-//! [`VSIter`]: ../struct.VSIter.html#implementations
 //!
 //! Enable the feature:
 //!
 //! **Cargo.toml**
-//! [dependencies]
-//! ```voluntary_servitude = { version = "3", features = "serde-traits" }```
 //!
-//! For testing the feature "serde-tests" must be enabled
+//! ```toml
+//! [dependencies]
+//! voluntary_servitude = { version = "3", features = "serde-traits" }
+//! ```
+//!
+//! For testing the feature `serde-tests` must be enabled
+//!
 //! ```bash
 //! cargo test --features "serde-traits serde-tests"
 //! ```
 
-use iterator::VSIter;
-use serde_lib::{
-    de::SeqAccess, de::Visitor, ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde_lib::{de::SeqAccess, de::Visitor, ser::SerializeSeq};
+use serde_lib::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, fmt::Formatter, marker::PhantomData};
-use voluntary_servitude::{VSInner, VoluntaryServitude};
+use voluntary_servitude::{Inner, VoluntaryServitude};
 
-struct VSInnerVisitor<'a, T: 'a + Deserialize<'a>>(pub PhantomData<&'a T>);
+/// Abstracts serializer visitor
+struct InnerVisitor<'a, T: 'a + Deserialize<'a>>(pub PhantomData<&'a T>);
 
-impl<'a, T: Deserialize<'a>> Visitor<'a> for VSInnerVisitor<'a, T> {
-    type Value = VSInner<T>;
+impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
+    type Value = Inner<T>;
 
     #[inline]
     fn expecting(&self, f: &mut Formatter) -> fmt::Result {
@@ -40,7 +35,7 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for VSInnerVisitor<'a, T> {
 
     #[inline]
     fn visit_seq<A: SeqAccess<'a>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let inner = VSInner::<T>::default();
+        let inner = Inner::<T>::default();
         while let Some(value) = seq.next_element()? {
             inner.append(value);
         }
@@ -48,24 +43,11 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for VSInnerVisitor<'a, T> {
     }
 }
 
-impl<'a, T: Serialize> Serialize for VSIter<'a, T> {
-    #[inline]
-    fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        debug!("Serialize VSIter");
-        let len = self.len();
-        let mut seq = ser.serialize_seq(Some(len))?;
-        for (el, _) in self.clone().zip(0..len) {
-            seq.serialize_element(el)?;
-        }
-        seq.end()
-    }
-}
-
-impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VSInner<T> {
+impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for Inner<T> {
     #[inline]
     fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
-        debug!("Deserialize VSInner");
-        des.deserialize_seq(VSInnerVisitor(PhantomData))
+        debug!("Deserialize Inner");
+        des.deserialize_seq(InnerVisitor(PhantomData))
     }
 }
 
@@ -73,7 +55,12 @@ impl<T: Serialize> Serialize for VoluntaryServitude<T> {
     #[inline]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         trace!("Serialize VoluntaryServitude");
-        self.iter().serialize(ser)
+        let len = self.len();
+        let mut sequence = ser.serialize_seq(Some(len))?;
+        for (el, _) in self.iter().zip(0..len) {
+            sequence.serialize_element(el)?;
+        }
+        sequence.end()
     }
 }
 

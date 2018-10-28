@@ -4,7 +4,7 @@ use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;
 const PRODUCERS: usize = 4;
-const ELEMENTS: usize = 10000;
+const ELEMENTS: usize = 10000000;
 
 fn main() {
     let list = Arc::new(vs![]);
@@ -23,13 +23,15 @@ fn main() {
     for _ in 0..CONSUMERS {
         const TOTAL: usize = PRODUCERS * ELEMENTS;
         let consumer = Arc::clone(&list);
-        handlers.push(spawn(move || while {
-            let count = consumer.iter().count();
-            println!("{} elements", count);
-            // This is just a do-while for demonstration purposes
-            // Don't take it very seriously
-            count < TOTAL
-        } {}));
+        handlers.push(spawn(move || {
+            while {
+                let count = consumer.iter().count();
+                println!("{} elements", count);
+                // This is just a do-while for demonstration purposes
+                // Don't take it very seriously
+                count < TOTAL
+            } {}
+        }));
     }
 
     // Join threads

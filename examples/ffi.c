@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
     vs_t * vs = vs_new();
 
     // Current vs_t length
-    // Be careful with data-races since the value, when used, may not be true anymore
+    // Be careful with race conditions since the value, when used, may not be true anymore
     assert(vs_len(vs) == 0);
 
     const unsigned int data[2] = {12, 25};
@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
 
     assert(vs_iter_next(iter) == NULL);
     assert(vs_iter_index(iter) == 2);
-	// Index doesn't increase after it gets equal to 'len'
-	// Length also is unable to increase after iterator is consumed
+    // Index doesn't increase after it gets equal to 'len'
+    // Length also is unable to increase after iterator is consumed
     assert(vs_iter_index(iter) == vs_iter_len(iter));
 
     // Never forget to free vs_iter_t

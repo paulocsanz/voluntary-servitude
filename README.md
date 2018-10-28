@@ -2,20 +2,31 @@
 
 * [Documentation](https://docs.rs/voluntary-servitude/3.0.0/voluntary-servitude)
 
-- Implements a lock-free thread-safe appendable list with a lock-free iterator
-- FFI implementation available, C examples are in **./examples** folder
+# Features
+ - Atomic abstractions (`Atomic`, `AtomicOption`, `FillOnceAtomicOption`, `FillOnceAtomicArc`)
+ - Thread-safe appendable list with a lock-free iterator (`VoluntaryServitude` - also called `VS`)
+ - Serde serialization (`serde-traits` feature)
+ - Call this code from C (FFI) (also in **./examples**)
+ - System Allocator (`system-alloc` feature)
+ - Logging (`logs` feature)
 
-    `cd examples && make test` (runs rust and C examples)
-- Latest release in **./dist** (uses system allocator)
-- Uses rust allocator by default, system allocator can be enable with the 'system-alloc' feature
-- Logging is available behind the 'logs' feature and RUST_LOG env var
-- Serde's Serialize/Deserialize traits available behind the 'serde-traits' feature
+# Atomic abstractions
+ - **Atomic** -> atomic `Box<T>`
+ - **AtomicOption** -> atomic `Option<Box<T>>`
+ - **FillOnceAtomicOption** -> atomic `Option<Box<T>>` that can give references (ideal for iterators)
+ - **FillOnceAtomicArc** -> atomic `Option<Arc<T>>` with a limited Api (like `FillOnceAtomicOption`)
+
+With `Atomic` and `AtomicOption` it's not safe to get a reference, you must replace the value to access it
+
+To safely get a reference to T you must use `FillOnceAtomicOption` and accept the API limitations
+
+A safe `AtomicArc` is impossible, so you must use `ArcCell` from crossbeam (locks to clone) or `FillOnceAtomicArc`
 
 ## Licenses
 
-[MIT](LICENSE_MIT) or [Apache-2.0](LICENSE_APACHE)
+[MIT](LICENSE_MIT) and [Apache-2.0](LICENSE_APACHE)
 
-## Examples
+## `VoluntaryServitude` Examples
 
 - [Single thread - Rust](#single-thread)
 - [Multi producers, multi consumers - Rust](#multi-producers-multi-consumers)
@@ -24,7 +35,7 @@
 
 ### Single thread
 
-```
+```rust
 #[macro_use]
 extern crate voluntary_servitude;
 
@@ -36,10 +47,10 @@ fn main() {
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 
     // Current VS's length
-    // Be careful with data-races since the value, when used, may not be true anymore
+    // Be careful with race conditions since the value, when used, may not be true anymore
     assert_eq!(list.len(), 3);
 
-    // The 'iter' method makes a one-time lock-free iterator (VSIter)
+    // The 'iter' method makes a one-time lock-free iterator (Iter)
     for (index, element) in list.iter().enumerate() {
         assert_eq!(index, *element);
     }
@@ -63,7 +74,7 @@ fn main() {
 
 ### Multi producers, multi consumers
 
-```
+```rust
 #[macro_use]
 extern crate voluntary_servitude;
 use std::{sync::Arc, thread::spawn};
@@ -107,7 +118,7 @@ fn main() {
 
 ### Single thread C (FFI)
 
-```
+```c
 #include<assert.h>
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
@@ -117,7 +128,7 @@ int main(int argc, char **argv) {
     vs_t * vs = vs_new();
 
     // Current vs_t length
-    // Be careful with data-races since the value, when used, may not be true anymore
+    // Be careful with race conditions since the value, when used, may not be true anymore
     assert(vs_len(vs) == 0);
 
     const unsigned int data[2] = {12, 25};
@@ -141,8 +152,8 @@ int main(int argc, char **argv) {
 
     assert(vs_iter_next(iter) == NULL);
     assert(vs_iter_index(iter) == 2);
-	// Index doesn't increase after it gets equal to 'len'
-	// Length also is unable to increase after iterator is consumed
+    // Index doesn't increase after it gets equal to 'len'
+    // Length also is unable to increase after iterator is consumed
     assert(vs_iter_index(iter) == vs_iter_len(iter));
 
     // Never forget to free vs_iter_t
@@ -170,7 +181,7 @@ int main(int argc, char **argv) {
 
 ### Multi producers, multi consumers - C (FFI)
 
-```
+```c
 #include<pthread.h>
 #include<assert.h>
 #include<stdlib.h>
@@ -190,7 +201,7 @@ void * consumer(void *);
 int main(int argc, char** argv) {
     // You are responsible for making sure 'vs' exists while accessed
     vs_t * vs = vs_new();
-	uint8_t thread = 0;
+    uint8_t thread = 0;
     pthread_attr_t attr;
     pthread_t consumers[num_consumers],
               producers[num_producers];
@@ -225,7 +236,7 @@ int main(int argc, char** argv) {
         pthread_join(consumers[thread], NULL);
     }
 
-    // Never forget to free the memory allocated through rust
+    // Never forget to free the memory allocated through the lib
     assert(vs_destroy(vs) == 0);
 
     printf("Multi thread example ended without errors\n");
@@ -257,6 +268,7 @@ void * consumer(void * vs) {
         }
         printf("Consumer counts %d elements summing %d.\n", values, sum);
 
+        // Never forget to free the memory allocated through the lib
         assert(vs_iter_destroy(iter) == 0);
     }
     return NULL;

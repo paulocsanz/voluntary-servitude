@@ -1,11 +1,8 @@
 #[macro_use]
 extern crate voluntary_servitude;
 
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
-};
-use std::{cmp::max, mem, thread::spawn};
+use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, Arc};
+use std::{cmp::max, thread::spawn};
 
 fn setup_logger() {
     #[cfg(feature = "logs")]
@@ -206,7 +203,7 @@ fn elements_n(num: usize) {
 
     let mut iter = list.iter();
     let iter_count = list.iter();
-    mem::drop(list);
+    list.clear();
     assert_eq!(iter_count.count(), num);
     assert_eq!(iter.next(), Some(&0));
 }

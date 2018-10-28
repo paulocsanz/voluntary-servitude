@@ -1,46 +1,52 @@
-//! `VoluntaryServitude` node implementation
+//! [`VoluntaryServitude`] node implementation
+//!
+//! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::{fmt, fmt::Debug, fmt::Formatter, ptr::null_mut, ptr::NonNull};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::sync::atomic::Ordering;
+use {FillOnceAtomicOption, NotEmpty};
 
-/// One `VoluntaryServitude` element
+/// One [`VoluntaryServitude`] element
+///
+/// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 pub struct Node<T> {
     /// Inner value
     value: T,
     /// Next node in chain
-    next: AtomicPtr<Node<T>>,
+    next: FillOnceAtomicOption<Node<T>>,
 }
 
 impl<T> Node<T> {
     /// Returns reference to inner value
     #[inline]
     pub fn value(&self) -> &T {
-        trace!("Node value");
+        trace!("value() = {:p}", &self.value as *const T);
         &self.value
     }
 
     /// Creates new node with inner value
     #[inline]
     pub fn new(value: T) -> Self {
-        trace!("New node");
-        Self {
-            value,
-            next: AtomicPtr::new(null_mut()),
-        }
+        trace!("new()");
+        let next = FillOnceAtomicOption::default();
+        Self { value, next }
     }
 
-    /// Returns consumable reference to Self
+    /// Atomically extracts ref to next Node
     #[inline]
-    pub fn next(&self) -> Option<NonNull<Self>> {
-        trace!("Next node");
-        NonNull::new(self.next.load(Ordering::SeqCst))
+    pub fn next(&self) -> Option<&Self> {
+        trace!("next()");
+        self.next.get_ref(Ordering::SeqCst)
     }
 
-    /// Replaces `self.next` with pointer, returns old pointer
+    /// If [`FillOnceAtomicOption`] was empty it will fill it and return None, otherwise return the [`NotEmpty`] error
+    ///
+    /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
+    /// [`NotEmpty`]: ./struct.NotEmpty.html
     #[inline]
-    pub fn swap_next(&self, ptr: *mut Self) -> Option<NonNull<Self>> {
-        trace!("Swap next node");
-        NonNull::new(self.next.swap(ptr, Ordering::SeqCst))
+    pub fn try_set_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
+        trace!("try_set_next({:p})", node);
+        self.next.try_store(node, Ordering::SeqCst)
     }
 }
 
@@ -48,38 +54,22 @@ impl<T> Node<T> {
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
         info!("Drop chained nodes");
-        let mut node = self.next.swap(null_mut(), Ordering::SeqCst);
-        while !node.is_null() {
-            unsafe {
-                let next = (*node).next.swap(null_mut(), Ordering::SeqCst);
-                drop(Box::from_raw(node));
-                node = next;
-            }
+        let mut node = unsafe { self.next.dangle() };
+        while let Some(n) = node.take() {
+            let next = unsafe { n.next.dangle() };
+            drop(n);
+            node = next;
         }
-        trace!("Dropped all chained nodes");
+        debug!("Dropped all chained nodes");
     }
 }
 
-/// Default Debug is recursive and causes a stackoverflow easily
 impl<T: Debug> Debug for Node<T> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        trace!("Debug Node");
-        write!(f, "Node {{ value: {:?}, next: ", self.value)?;
-        let next = self.next.load(Ordering::SeqCst);
-        if next.is_null() {
-            write!(f, "None }}")?;
-        } else {
-            unsafe {
-                let next_next = (*next).next.load(Ordering::SeqCst);
-                let has_next = if next_next.is_null() { "Some" } else { "None" };
-                write!(
-                    f,
-                    "Some(Node {{ value: {:?}, next: {} }}) }}",
-                    (*next).value,
-                    has_next
-                )?;
-            }
-        }
-        Ok(())
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        f.debug_struct("Node")
+            .field("value", &self.value)
+            .field("next", &self.next.get_raw(Ordering::SeqCst))
+            .finish()
     }
 }

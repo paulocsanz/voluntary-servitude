@@ -1,254 +1,228 @@
-//! Lock-free appendable list
+//! Thread-safe appendable list that can create a lock-free iterator
 
-use iterator::{CrateConstructor, VSIter};
-use node::Node;
-use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{fmt, fmt::Debug, fmt::Formatter, iter::FromIterator, ptr::null_mut};
-use std::{hash::Hash, hash::Hasher, mem::drop, ptr::NonNull};
+use crossbeam::sync::ArcCell;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::sync::{atomic::AtomicPtr, atomic::AtomicUsize, atomic::Ordering, Arc};
+use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::NonNull};
+use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
+
+#[cfg(feature = "serde-traits")]
+use serde_lib::{Deserialize, Deserializer};
+
+#[cfg(feature = "rayon-traits")]
+use rayon::ParIter;
+#[cfg(feature = "rayon-traits")]
+use rayon_lib::prelude::*;
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
 /// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
-pub struct VSInner<T> {
-    /// Number of elements inside `VSInner`
+#[derive(Debug)]
+pub struct Inner<T> {
+    /// Number of elements inside `Inner`
     size: AtomicUsize,
-    /// Atomic references counter
-    copies: AtomicUsize,
-    /// First node in `VSInner`
-    first_node: AtomicPtr<Node<T>>,
-    /// Last node in `VSInner`
+    /// First node in `Inner`
+    first_node: FillOnceAtomicOption<Node<T>>,
+    /// Last node in `Inner`
     last_node: AtomicPtr<Node<T>>,
 }
 
-impl<T> Default for VSInner<T> {
+impl<T> Default for Inner<T> {
     #[inline]
     fn default() -> Self {
-        trace!("Default VSInner");
         Self {
-            size: AtomicUsize::new(0),
-            copies: AtomicUsize::new(1),
-            first_node: AtomicPtr::new(null_mut()),
-            last_node: AtomicPtr::new(null_mut()),
+            size: AtomicUsize::default(),
+            first_node: FillOnceAtomicOption::default(),
+            last_node: AtomicPtr::default(),
         }
     }
 }
 
-impl<T> VSInner<T> {
-    #[inline]
-    /// Increases references count and returns pointer to self
-    pub fn create_ref(&mut self) -> *mut Self {
-        info!("Cloning VSInner, increasing references count");
-        let _ = self.copies.fetch_add(1, Ordering::SeqCst);
-        self as *mut _
-    }
-
-    /// Decreases references count (drop all nodes if it's the last reference)
-    #[inline]
-    pub fn drop_ref(&self) {
-        info!("Decreasing references counter, drop all nodes if it's the last reference");
-        if self.copies.fetch_sub(1, Ordering::SeqCst) == 1 {
-            debug!("Last reference, dropping nodes");
-            let first = NonNull::new(self.first_node.swap(null_mut(), Ordering::SeqCst));
-            let _ = first.map(|nn| unsafe { drop(Box::from_raw(nn.as_ptr())) });
-        }
-    }
-
-    #[inline]
+impl<T> Inner<T> {
     /// Atomically extracts pointer to first node
-    pub fn first_node(&self) -> *mut Node<T> {
-        trace!("First Node in VSInner");
-        self.first_node.load(Ordering::SeqCst)
+    #[inline]
+    pub fn first_node(&self) -> Option<NonNull<Node<T>>> {
+        let nn = NonNull::new(self.first_node.get_raw(Ordering::SeqCst));
+        trace!("first_node() = {:?}", nn);
+        nn
     }
 
+    /// Atomically extracts `Inner`'s size
     #[inline]
-    /// Atomically extracts `VSInner`'s size
     pub fn len(&self) -> usize {
-        trace!("VSInner length");
-        self.size.load(Ordering::SeqCst)
+        let len = self.size.load(Ordering::SeqCst);
+        trace!("len() = {}", len);
+        len
     }
 
+    /// Atomically checks if `Inner`'s size is `0`
     #[inline]
-    /// Atomically checks if `VSInner`'s size is 0
     pub fn is_empty(&self) -> bool {
-        trace!("VSInner is empty");
         self.len() == 0
     }
 
-    /// Appends node to end of `VSInner` (inserts first_node if it's the first)
-    pub fn append(&self, value: T) {
-        trace!("Append to VSInner");
-        let ptr = Box::into_raw(Box::new(Node::new(value)));
-        if let Some(nn) = NonNull::new(self.last_node.swap(ptr, Ordering::SeqCst)) {
-            debug!("Adding element to the end of the list");
-            let before = unsafe { nn.as_ref().swap_next(ptr) };
-            debug_assert!(before.is_none(), "First node wasn't actually first");
-        } else {
-            debug!("First element to be added");
-            let before = self.first_node.swap(ptr, Ordering::SeqCst).is_null();
-            debug_assert!(
-                self.is_empty() || before,
-                "Last node wasn't empty but should"
+    /// Tries to insert first element
+    #[inline]
+    fn start(&self, boxed: Box<Node<T>>) -> Result<(), NotEmpty> {
+        trace!("start({:p})", boxed);
+        self.first_node.try_store(boxed, Ordering::SeqCst)
+    }
+
+    /// Swaps last node, returning old one
+    #[inline]
+    fn swap_last(&self, ptr: *mut Node<T>) -> Option<NonNull<Node<T>>> {
+        trace!("swap_last({:p})", ptr);
+        NonNull::new(self.last_node.swap(ptr, Ordering::SeqCst))
+    }
+
+    #[inline]
+    /// Unsafelly append a `Node<T>` chain to `Inner<T>`
+    pub unsafe fn append_chain(&self, first: *mut Node<T>, last: *mut Node<T>, length: usize) {
+        debug!("append_chain({:p}, {:p}, {})", first, last, length);
+        let _ = self
+            .swap_last(last)
+            .or_else(|| empty!(self.start(Box::from_raw(first)).err(); "Filled first"))
+            .map(
+                |nn| empty!(nn.as_ref().try_set_next(Box::from_raw(first)).err(); "Last had next"),
             );
-        }
 
-        trace!("Increased size");
-        let _ = self.size.fetch_add(1, Ordering::SeqCst);
+        info!("Increased size by {}", length);
+        let _ = self.size.fetch_add(length, Ordering::SeqCst);
+    }
+
+    /// Appends node to end of `Inner` (inserts first_node if it's the first)
+    #[inline]
+    pub fn append(&self, value: T) {
+        let ptr = Box::into_raw(Box::new(Node::new(value)));
+        unsafe { self.append_chain(ptr, ptr, 1) };
+    }
+
+    #[inline]
+    /// Extracts chain and drops itself without dropping it
+    pub fn into_inner(self) -> (usize, *mut Node<T>, *mut Node<T>) {
+        trace!("into_inner()");
+        let size = self.size.into_inner();
+        let first = self.first_node.into_inner().into_ptr();
+        let last = self.last_node.into_inner();
+        (size, first, last)
     }
 }
 
-/// Default Debug is recursive and causes a stackoverflow easily
-impl<T: Debug> Debug for VSInner<T> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        trace!("Debug VSInner");
-        unsafe {
-            let first_node = self.first_node.load(Ordering::SeqCst);
-            let first_node = NonNull::new(first_node).map(|nn| &*nn.as_ptr());
-
-            let last_node = self.last_node.load(Ordering::SeqCst);
-            let last_node = NonNull::new(last_node).map(|nn| &*nn.as_ptr());
-            write!(
-                f,
-                "VoluntaryServitude {{ size: {:?}, copies: {:?}, first_node: {:?}, last_node: {:?} }}",
-                self.size.load(Ordering::SeqCst),
-                self.copies.load(Ordering::SeqCst),
-                first_node,
-                last_node
-            )
-        }
+impl<T> FromIterator<T> for Inner<T> {
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        trace!("FromIterator<T>");
+        let inner = Self::default();
+        let _ = iter.into_iter().map(|v| inner.append(v)).count();
+        inner
     }
 }
 
-/// Lock-free appendable list (also called [`VS`])
+/// Appendable list with lock-free iterator (also called [`VS`])
 ///
-/// Parallel examples in main lib docs
 ///
+/// # Examples
+///  - [`Single-thread`]
+///  - [`Multi-producer, multi-consumer`]
+///
+/// [`Single-thread`]: #single-thread
+/// [`Multi-producer, multi-consumer`]: #multi-producer-multi-consumer
 /// [`VS`]: ./type.VS.html
+///
+/// # Single thread
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # use voluntary_servitude::VS;
 /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-/// let list = vs![3, 2];
-/// assert_eq!(list.len(), 2);
-/// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
+/// let (a, b, c) = (0usize, 1usize, 2usize);
+/// // VS alias to VoluntaryServitude
+/// // vs! alias to voluntary_servitude! (and operate like vec!)
+/// let list = vs![a, b, c];
+/// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 ///
-/// list.clear();
-/// assert!(list.is_empty());
+/// // Current VS's length
+/// // Be careful with race conditions since the value, when used, may not be true anymore
+/// assert_eq!(list.len(), 3);
 ///
-/// // You can deep copy a `VS` if T is Copy
-/// use std::iter::FromIterator;
-/// let list2 = VS::from_iter(list.iter());
-/// list2.append(3);
-/// assert_eq!(list.len() + 1, list2.len());
-///
-/// for el in list.iter() {
-///     assert_eq!(el, &3);
+/// // The 'iter' method makes a one-time lock-free iterator (Iter)
+/// for (index, element) in list.iter().enumerate() {
+///     assert_eq!(index, *element);
 /// }
+///
+/// // You can get the current iteration index
+/// // iter.next() == iter.len() means iteration ended (iter.next() == None)
+/// let mut iter = list.iter();
+/// assert_eq!(iter.index(), 0);
+/// assert_eq!(iter.next(), Some(&0));
+/// assert_eq!(iter.index(), 1);
+///
+/// // List can also be cleared (but current iterators are not affected)
+/// list.clear();
+///
+/// assert_eq!(iter.len(), 3);
+/// assert_eq!(list.len(), 0);
+/// assert_eq!(list.iter().len(), 0);
+/// assert_eq!(list.iter().next(), None);
+///
+/// println!("Single thread example ended without errors");
 /// ```
-pub struct VoluntaryServitude<T> {
-    /// Atomic reference to VSInner
-    inner: AtomicPtr<VSInner<T>>,
-}
+///
+/// # Multi-producer, multi-consumer
+///
+/// ```rust
+/// # #[macro_use] extern crate voluntary_servitude;
+/// use std::{sync::Arc, thread::spawn};
+///
+/// const CONSUMERS: usize = 8;
+/// const PRODUCERS: usize = 4;
+/// const ELEMENTS: usize = 10000;
+///
+/// let list = Arc::new(vs![]);
+/// let mut handlers = vec![];
+///
+/// // Creates producer threads to insert 10k elements
+/// for _ in 0..PRODUCERS {
+///     let l = Arc::clone(&list);
+///     handlers.push(spawn(move || { let _ = (0..ELEMENTS).map(|i| l.append(i)).count(); }));
+/// }
+///
+/// // Creates consumer threads to print number of elements until all of them are inserted
+/// for _ in 0..CONSUMERS {
+///     let consumer = Arc::clone(&list);
+///     handlers.push(spawn(move || {
+///         loop {
+///             let count = consumer.iter().count();
+///             println!("{} elements", count);
+///             if count == PRODUCERS * ELEMENTS { break; }
+///         }
+///     }));
+/// }
+///
+/// // Join threads
+/// for handler in handlers.into_iter() {
+///     handler.join().expect("Failed to join thread");
+/// }
+///
+/// println!("Multi thread example ended without errors");
+/// ```
+pub struct VoluntaryServitude<T>(ArcCell<Inner<T>>);
 
 /// [`VoluntaryServitude`]'s alias
 ///
 /// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 pub type VS<T> = VoluntaryServitude<T>;
 
-#[cfg(feature = "serde-traits")]
-use serde_lib::{Deserialize, Deserializer};
-
-#[cfg(feature = "serde-traits")]
-impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
-    fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
-        trace!("Deserialize VoluntaryServitude");
-        VSInner::deserialize(des).map(|inner| Self {
-            inner: AtomicPtr::new(Box::into_raw(Box::new(inner))),
-        })
-    }
-}
-
-impl<T> FromIterator<T> for VoluntaryServitude<T> {
-    #[inline]
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        debug!("VSInner<T> from IntoIterator<T>");
-        let vs = vs![];
-        let _ = iter.into_iter().map(|v| vs.append(v)).count();
-        vs
-    }
-}
-
-impl<'a, T: 'a + Copy> FromIterator<&'a T> for VoluntaryServitude<T> {
-    #[inline]
-    fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
-        trace!("VoluntaryServitude<T> from IntoIterator<&'a T> where T: Copy");
-        VS::from_iter(iter.into_iter().cloned())
-    }
-}
-
-impl<T: Hash> Hash for VoluntaryServitude<T> {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        trace!("Hash VoluntaryServitude");
-        self.iter().hash(state);
-    }
-}
-
-impl<T: PartialEq> PartialEq for VoluntaryServitude<T> {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        trace!("PartialEq VoluntaryServitude");
-        let len = self.len();
-        if len == 0 && other.is_empty() {
-            return true;
-        };
-        self.iter()
-            .zip(other.iter())
-            .zip(0..len)
-            .filter(|((a, b), _)| a == b)
-            .count()
-            > 0
-    }
-}
-impl<T: Eq> Eq for VoluntaryServitude<T> {}
-
-impl<T: Debug> Debug for VoluntaryServitude<T> {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        trace!("Debug VoluntaryServitude");
-        write!(f, "VoluntaryServitude {{ inner: {:?} }}", self.inner())
-    }
-}
-
-impl<T> Default for VoluntaryServitude<T> {
-    #[inline]
-    fn default() -> Self {
-        trace!("Default VoluntaryServitude");
-        Self {
-            inner: AtomicPtr::new(Box::into_raw(Box::new(VSInner::default()))),
-        }
-    }
-}
-
-impl<T> Drop for VoluntaryServitude<T> {
-    #[inline]
-    fn drop(&mut self) {
-        debug!("Drop VoluntaryServitude");
-        unsafe { (*self.inner.load(Ordering::SeqCst)).drop_ref() };
-    }
-}
-
 impl<T> VoluntaryServitude<T> {
-    /// Extracts reference to VSInner from AtomicPtr
+    /// Creates new `VoluntaryServitude` from [`Inner`]
+    ///
+    /// [`Inner`]: ./struct.Inner.html
     #[inline]
-    fn inner(&self) -> &VSInner<T> {
-        trace!("VSInner from VoluntaryServitude");
-        unsafe { &*self.inner.load(Ordering::SeqCst) }
+    fn new(inner: Inner<T>) -> Self {
+        trace!("new()");
+        VoluntaryServitude(ArcCell::new(Arc::new(inner)))
     }
 
-    /// Atomically extracts current size, be careful with data-races when using it
-    ///
-    /// May grow or be set to 0
+    /// Atomically extracts current size, be careful with race conditions when using it
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -262,12 +236,10 @@ impl<T> VoluntaryServitude<T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.inner().len()
+        self.0.get().len()
     }
 
-    /// Atomically checks if [`VS`] is empty, be careful with data-races when using it
-    ///
-    /// [`VS`]: ./type.VS.html
+    /// Atomically checks if `VS` is empty, be careful with race conditions when using it
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -279,40 +251,7 @@ impl<T> VoluntaryServitude<T> {
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.inner().is_empty()
-    }
-
-    /// Makes lock-free iterator based on VoluntaryServitude
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![3, 2];
-    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
-    /// ```
-    #[inline]
-    pub fn iter<'a>(&self) -> VSIter<'a, T> {
-        debug!("Iter VoluntaryServitude");
-        unsafe { VSIter::new(&mut *(*self.inner.load(Ordering::SeqCst)).create_ref()) }
-    }
-
-    /// Clears list (iterators referencing old chain will still work)
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![3, 2];
-    /// let iter = list.iter();
-    /// list.clear();
-    /// assert_eq!(iter.len(), 2);
-    /// assert_eq!(list.len(), 0);
-    /// ```
-    #[inline]
-    pub fn clear(&self) {
-        debug!("Clear VoluntaryServitude");
-
-        let ptr = Box::into_raw(Box::new(VSInner::<T>::default()));
-        unsafe { (*self.inner.swap(ptr, Ordering::SeqCst)).drop_ref() };
+        self.0.get().is_empty()
     }
 
     /// Insert element after last node
@@ -330,7 +269,203 @@ impl<T> VoluntaryServitude<T> {
     /// ```
     #[inline]
     pub fn append(&self, value: T) {
-        self.inner().append(value);
+        self.0.get().append(value);
+    }
+
+    /// Makes lock-free iterator based on `VS`
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![3, 2];
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
+    /// for (index, element) in list.iter().enumerate() {
+    ///     assert_eq!(*element, [3, 2][index]);
+    /// }
+    /// ```
+    #[inline]
+    pub fn iter(&self) -> Iter<T> {
+        Iter::new(self.0.get())
+    }
+
+    /// Clears list (iterators referencing old chain will still work)
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![3, 2];
+    /// let iter = list.iter();
+    /// list.clear();
+    /// assert_eq!(iter.len(), 2);
+    /// assert_eq!(list.len(), 0);
+    /// assert_eq!(list.iter().len(), 0);
+    /// ```
+    #[inline]
+    pub fn clear(&self) {
+        debug!("clear()");
+        drop(self.0.set(Arc::new(Inner::default())));
+    }
+
+    /// Extends `VS` like the `Extend` trait, but without needing a mutable reference
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![1, 2, 3];
+    /// list.extend_immutable(vec![4, 5, 6]);
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    ///
+    /// let list = vs![1, 2, 3];
+    /// list.extend_immutable(vs![4, 5, 6].iter().cloned());
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    ///
+    /// let list = vs![1, 2, 3];
+    /// list.extend_immutable(vec![&4, &5, &6].into_iter().cloned());
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    /// ```
+    #[inline]
+    pub fn extend_immutable<I: IntoIterator<Item = T>>(&self, iter: I) {
+        trace!("extend_immutable()");
+        let (size, first, last) = Inner::from_iter(iter).into_inner();
+        unsafe { self.0.get().append_chain(first, last, size) };
+    }
+
+    /// Parallely Compare `VS` like the `PartialEq` using the ParallelIterator trait, but without needing a mutable reference
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # extern crate rayon;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    ///
+    /// let list = vs![1, 2, 3];
+    /// assert!(list.par_eq(vs![1, 2, 3]);
+    /// assert!(!list.par_eq(vs![1, 2, 4]));
+    /// ```should_panic
+    #[cfg(feature = "rayon-traits")]
+    #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
+    #[inline]
+    pub fn par_eq(&self, other: &Self) -> bool {
+        trace!("par_eq()");
+        /*
+        self.par_iter().zip(other.par_iter()).filter(|(s, o)| s == o).count() == self.len();
+        */
+        unimplemented!();
+    }
+}
+
+impl<T> Default for VoluntaryServitude<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new(Inner::default())
+    }
+}
+
+impl<T: Debug> Debug for VoluntaryServitude<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        f.debug_struct("VoluntaryServitude")
+            .field("arc_cell", &self.0.get())
+            .finish()
+    }
+}
+
+#[cfg(feature = "serde-traits")]
+impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
+    #[inline]
+    fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
+        Inner::deserialize(des).map(Self::new)
+    }
+}
+
+#[cfg(feature = "rayon-traits")]
+impl<'a, T: 'a + Sync + Send> IntoParallelRefIterator<'a> for VoluntaryServitude<T> {
+    type Item = T;
+    type Iter = ParIter<'a, Self::Item>;
+
+    #[inline]
+    fn par_iter(&self) -> Self::Iter {
+        Self::ParIter::new(self.0.get())
+    }
+}
+
+#[cfg(feature = "rayon-traits")]
+impl<T: 'a + Send + Sync> FromParallelIterator<T> for VoluntaryServitude<T> {
+    #[inline]
+    fn from_par_iter<I: IntoParallelIterator<Item = T>>(par_iter: I) -> Self {
+        trace!("from_par_iter()");
+        let vs = vs![];
+        par_iter.into_par_iter().for_each(|el| vs.append(el));
+        vs
+    }
+}
+
+#[cfg(feature = "rayon-traits")]
+impl<T: Send + Sync> ParallelExtend<T> for VoluntaryServitude<T> {
+    #[inline]
+    fn par_extend<I: IntoParallelIterator<Item = T>>(&mut self, par_iter: I) {
+        trace!("par_extend()");
+        let vs = vs![];
+        let vs_ref = &vs;
+        par_iter.into_par_iter().for_each(|el| vs_ref.append(el));
+    }
+}
+
+impl<T> Extend<T> for VoluntaryServitude<T> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        self.extend_immutable(iter)
+    }
+}
+
+impl<'a, T: 'a + Copy> Extend<&'a T> for VoluntaryServitude<T> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
+        self.extend_immutable(iter.into_iter().cloned());
+    }
+}
+
+impl<T> FromIterator<T> for VoluntaryServitude<T> {
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self::new(Inner::from_iter(iter))
+    }
+}
+
+impl<'a, T: 'a + Copy> FromIterator<&'a T> for VoluntaryServitude<T> {
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
+        Self::from_iter(iter.into_iter().cloned())
+    }
+}
+
+impl<T: Send + Sync> VoluntaryServitude<T> {
+    /// Parallely Extends [`VS`] like the ParallelExtend trait, but without a mutable reference
+    ///
+    /// [`VS`]: ./type.VS.html
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # extern crate rayon;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    ///
+    /// let list = vs![1, 2, 3];
+    /// list.par_extend_immutable(vec![4, 5, 6]);
+    /// assert_eq!(list.par_iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    ///
+    /// let list = vs![1, 2, 3];
+    /// list.extend_immutable(vs![4, 5, 6].par_iter().cloned());
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    ///
+    /// let list = vs![1, 2, 3];
+    /// list.extend_immutable(vec![&4, &5, &6].into_par_iter().cloned());
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    /// ```
+    #[cfg(feature = "rayon-traits")]
+    #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
+    #[inline]
+    pub fn par_extend_immutable<I: IntoParallelIterator<Item = T>>(&self, par_iter: I) {
+        trace!("par_extend_immutable()");
+        par_iter.into_par_iter().for_each(|el| self.append(el));
     }
 }
 
@@ -357,8 +492,19 @@ mod tests {
     }
 
     #[test]
+    fn extend_partial_eq() {
+        let vs: VS<u8> = vs![1, 2, 3, 4, 5];
+        let iter = vs.iter();
+        vs.extend_immutable(iter.into_iter().cloned());
+        assert_eq!(
+            vs.iter().collect::<Vec<_>>(),
+            vec![&1u8, &2, &3, &4, &5, &1, &2, &3, &4, &5]
+        );
+    }
+
+    #[test]
     fn test_send() {
-        fn assert_send<T: Send>() {}
+        fn assert_send<T>() {}
         assert_send::<VoluntaryServitude<()>>();
     }
 
@@ -368,10 +514,12 @@ mod tests {
         assert_sync::<VoluntaryServitude<()>>();
     }
 
+    #[cfg(feature = "rayon-traits")]
     #[test]
-    fn partial_eq() {
-        assert_eq!(vs![1, 2, 3], vs![1, 2, 3]);
-        let vs = vs![2, 3, 4];
-        assert_eq!(&vs, &vs);
+    fn from_par_iter() {
+        let vec = vec![1, 2, 3, 4, 5, 6];
+        let sum: u8 = vec.iter().sum();
+        let vs = VS::from_par_iter(vec);
+        assert_eq!(vs.iter().sum::<u8>(), sum);
     }
 }

@@ -9,25 +9,26 @@ readme = "README.md"
 keywords = ["lock-free", "data-structure", "iterator", "vector", "thread-safe"]
 categories = ["concurrency", "data-structures"]
 
-[package.metadata.docs.rs]
-rustdoc-args = ["--cfg", "docs_rs_workaround"]
-all-features = true
-
 [lib]
 name = "voluntary_servitude"
 crate_type = ["lib", "cdylib"]
 
-[dev-dependencies]
-
 [dependencies]
+crossbeam = "0.3"
 log = { version = "0.4", optional = true }
 env_logger = { version = "0.5", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
+rayon = { version = "1", optional = true }
 
 [features]
 default = []
+#rayon-traits = ["rayon"]
 logs = ["log", "env_logger"]
 serde-traits = ["serde"]
 serde-tests = ["serde_json"]
 system-alloc = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docs_rs_workaround"]
+all-features = true
