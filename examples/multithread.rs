@@ -4,7 +4,7 @@ use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;
 const PRODUCERS: usize = 4;
-const ELEMENTS: usize = 10000000;
+const ELEMENTS: usize = 10_000_000;
 
 fn main() {
     let list = Arc::new(vs![]);

@@ -4,7 +4,7 @@
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
-//!  - [`par_extend, from_par_iter rayon implementation`]
+//!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature`]
 //!  - [`Call this code from C (FFI)`] (also in **./examples**)
 //!  - [`System Allocator ("system-alloc" feature)`]
 //!  - [`Logging ("logs" feature)`]
@@ -35,13 +35,13 @@
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
-//! [`par_extend, from_par_iter rayon implementation`]: ./struct.VoluntaryServitude.html#impl-1
+//! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`Call this code from C (FFI)`]: ./ffi/index.html
 //! [`System Allocator ("system-alloc" feature)`]: ./static.GLOBAL_ALLOC.html
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
-//! [`Logging ("logs" feature)`]: ./fn.setup_logger.html
+//! [`Logging ("logs" feature)`]: ./index.html#functions
 
 #![cfg_attr(docs_rs_workaround, feature(allocator_api))]
 #![cfg_attr(docs_rs_workaround, feature(global_allocator))]
