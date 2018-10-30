@@ -81,7 +81,7 @@ use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;
 const PRODUCERS: usize = 4;
-const ELEMENTS: usize = 10000;
+const ELEMENTS: usize = 10000000;
 
 fn main() {
     let list = Arc::new(vs![]);
@@ -100,19 +100,19 @@ fn main() {
     for _ in 0..CONSUMERS {
         const TOTAL: usize = PRODUCERS * ELEMENTS;
         let consumer = Arc::clone(&list);
-        handlers.push(spawn(move || while {
+        handlers.push(spawn(move || loop {
             let count = consumer.iter().count();
             println!("{} elements", count);
-            // This is just a do-while for demonstration purposes
-            // Don't take it very seriously
-            count < TOTAL
-        } {}));
+            if count >= TOTAL { break };
+        }));
     }
 
     // Join threads
     for handler in handlers.into_iter() {
         handler.join().expect("Failed to join thread");
     }
+
+    println!("Multi-thread rust example ended without errors");
 }
 ```
 
@@ -188,12 +188,12 @@ int main(int argc, char **argv) {
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
-const unsigned int num_producers = 4;
 const unsigned int num_consumers = 8;
+const unsigned int num_producers = 4;
+const unsigned int num_threads = 12;
 
-const unsigned int num_producer_values = 1000;
-const unsigned int data[3] = {12, 25, 89};
-const size_t last_index = sizeof(data) / sizeof(data[0]) - 1;
+const unsigned int num_producer_values = 10000000;
+const unsigned int data = 3;
 
 void * producer(void *);
 void * consumer(void *);
@@ -203,8 +203,7 @@ int main(int argc, char** argv) {
     vs_t * vs = vs_new();
     uint8_t thread = 0;
     pthread_attr_t attr;
-    pthread_t consumers[num_consumers],
-              producers[num_producers];
+    pthread_t threads[num_threads];
 
     if (pthread_attr_init(&attr) != 0) {
         fprintf(stderr, "Failed to initialize pthread arguments.\n");
@@ -213,7 +212,7 @@ int main(int argc, char** argv) {
 
     // Creates producer threads
     for (thread = 0; thread < num_producers; ++thread) {
-        if (pthread_create(&producers[thread], &attr, &producer, (void *) vs) != 0) {
+        if (pthread_create(&threads[thread], &attr, &producer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create producer thread %d.\n", thread);
             exit(-2);
         }
@@ -222,24 +221,21 @@ int main(int argc, char** argv) {
 
     // Creates consumers threads
     for (thread = 0; thread < num_consumers; ++thread) {
-        if (pthread_create(&consumers[thread], &attr, &consumer, (void *) vs) != 0) {
+        if (pthread_create(&threads[num_producers + thread], &attr, &consumer, (void *) vs) != 0) {
             fprintf(stderr, "Failed to create consumer thread %d.\n", thread);
             exit(-3);
         }
     }
 
     // Join all threads, ensuring vs_t* is not used anymore
-    for (thread = 0; thread < num_producers; ++thread) {
-        pthread_join(producers[thread], NULL);
-    }
-    for (thread = 0; thread < num_consumers; ++thread) {
-        pthread_join(consumers[thread], NULL);
+    for (thread = 0; thread < num_threads; ++thread) {
+        pthread_join(threads[thread], NULL);
     }
 
     // Never forget to free the memory allocated through the lib
     assert(vs_destroy(vs) == 0);
 
-    printf("Multi thread example ended without errors\n");
+    printf("Multi-thread C example ended without errors\n");
     (void) argc;
     (void) argv;
     return 0;
@@ -248,7 +244,7 @@ int main(int argc, char** argv) {
 void * producer(void * vs){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        assert(vs_append(vs, (void *) &data[index % last_index]) == 0);
+        assert(vs_append(vs, (void *) &data) == 0);
     }
     return NULL;
 }
@@ -258,15 +254,14 @@ void * consumer(void * vs) {
     unsigned int values = 0;
 
     while (values < total_values) {
-        unsigned int sum = (values = 0);
         vs_iter_t * iter = vs_iter(vs);
         void * value;
 
+        values = 0;
         while ((value = vs_iter_next(iter)) != NULL) {
             ++values;
-            sum += *(unsigned int *) value;
         }
-        printf("Consumer counts %d elements summing %d.\n", values, sum);
+        printf("%d elements\n", values);
 
         // Never forget to free the memory allocated through the lib
         assert(vs_iter_destroy(iter) == 0);

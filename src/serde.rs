@@ -35,8 +35,10 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
 
     #[inline]
     fn visit_seq<A: SeqAccess<'a>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let inner: Inner<T> = Inner::default();
-        let _ = seq.next_element()?.map(|value| inner.append(value));
+        let inner = Inner::<T>::default();
+        while let Some(value) = seq.next_element()? {
+            inner.append(value);
+        }
         Ok(inner)
     }
 }
@@ -66,7 +68,7 @@ impl<T: Serialize> Serialize for VoluntaryServitude<T> {
 mod tests {
     #[cfg(feature = "serde-tests")]
     extern crate serde_json;
-    use VoluntaryServitude;
+    use VS;
 
     #[test]
     #[cfg(not(feature = "serde-tests"))]
@@ -80,7 +82,7 @@ mod tests {
     #[test]
     fn serde() {
         let string = serde_json::to_string(&vs![1u8, 2u8, 3u8, 4u8]).unwrap();
-        let vs: VoluntaryServitude<u8> = serde_json::from_str(&string).unwrap();
+        let vs: VS<u8> = serde_json::from_str(&string).unwrap();
         assert_eq!(vs.iter().collect::<Vec<_>>(), vec![&1u8, &2u8, &3u8, &4u8]);
     }
 }

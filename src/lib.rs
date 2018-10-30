@@ -121,7 +121,7 @@ extern crate log;
 #[cfg(feature = "logs")]
 extern crate env_logger;
 
-/// Setup logger according to `RUST_LOG` env var (must enable `logs` feature)
+/// Setup logger according to `RUST_LOG` env var
 ///
 /// *During tests log to stdout to supress output on passes*
 ///

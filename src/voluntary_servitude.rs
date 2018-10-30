@@ -166,40 +166,45 @@ impl<T> FromIterator<T> for Inner<T> {
 /// # Multi-producer, multi-consumer
 ///
 /// ```rust
-/// # #[macro_use] extern crate voluntary_servitude;
+/// #[macro_use]
+/// extern crate voluntary_servitude;
 /// use std::{sync::Arc, thread::spawn};
 ///
 /// const CONSUMERS: usize = 8;
 /// const PRODUCERS: usize = 4;
-/// const ELEMENTS: usize = 10000;
+/// const ELEMENTS: usize = 10000000;
 ///
-/// let list = Arc::new(vs![]);
-/// let mut handlers = vec![];
+/// fn main() {
+///     let list = Arc::new(vs![]);
+///     let mut handlers = vec![];
 ///
-/// // Creates producer threads to insert 10k elements
-/// for _ in 0..PRODUCERS {
-///     let l = Arc::clone(&list);
-///     handlers.push(spawn(move || { let _ = (0..ELEMENTS).map(|i| l.append(i)).count(); }));
-/// }
+///     // Creates producer threads to insert 10k elements
+///     for _ in 0..PRODUCERS {
+///         let l = Arc::clone(&list);
+///         handlers.push(spawn(move || {
+///             let _ = (0..ELEMENTS).map(|i| l.append(i)).count();
+///         }));
+///     }
 ///
-/// // Creates consumer threads to print number of elements until all of them are inserted
-/// for _ in 0..CONSUMERS {
-///     let consumer = Arc::clone(&list);
-///     handlers.push(spawn(move || {
-///         loop {
+///     // Creates consumer threads to print number of elements
+///     // Until all of them are inserted
+///     for _ in 0..CONSUMERS {
+///         const TOTAL: usize = PRODUCERS * ELEMENTS;
+///         let consumer = Arc::clone(&list);
+///         handlers.push(spawn(move || loop {
 ///             let count = consumer.iter().count();
 ///             println!("{} elements", count);
-///             if count == PRODUCERS * ELEMENTS { break; }
-///         }
-///     }));
-/// }
+///             if count >= TOTAL { break };
+///         }));
+///     }
 ///
-/// // Join threads
-/// for handler in handlers.into_iter() {
-///     handler.join().expect("Failed to join thread");
-/// }
+///     // Join threads
+///     for handler in handlers.into_iter() {
+///         handler.join().expect("Failed to join thread");
+///     }
 ///
-/// println!("Multi thread example ended without errors");
+///     println!("Multi-thread rust example ended without errors");
+/// }
 /// ```
 pub struct VoluntaryServitude<T>(ArcCell<Inner<T>>);
 
