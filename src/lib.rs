@@ -3,7 +3,8 @@
 //! # Features
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
-//!  - [`Serde serialization ("serde-traits" feature)`]
+//!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
+//!  - [`par_extend, from_par_iter rayon implementation`]
 //!  - [`Call this code from C (FFI)`] (also in **./examples**)
 //!  - [`System Allocator ("system-alloc" feature)`]
 //!  - [`Logging ("logs" feature)`]
@@ -33,7 +34,8 @@
 //! [`FillOnceAtomicArc`]: ./struct.FillOnceAtomicArc.html
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
-//! [`Serde serialization ("serde-traits" feature)`]: ./serde/index.html
+//! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
+//! [`par_extend, from_par_iter rayon implementation`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`Call this code from C (FFI)`]: ./ffi/index.html
 //! [`System Allocator ("system-alloc" feature)`]: ./static.GLOBAL_ALLOC.html
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
@@ -77,11 +79,11 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.1/voluntary-servitude")]
 
-#[cfg(feature = "serde-traits")]
-extern crate serde as serde_lib;
-
 #[cfg(feature = "rayon-traits")]
 extern crate rayon as rayon_lib;
+
+#[cfg(feature = "serde-traits")]
+extern crate serde as serde_lib;
 
 #[cfg(feature = "system-alloc")]
 use std::alloc::System;
@@ -225,39 +227,9 @@ mod voluntary_servitude;
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
 mod rayon;
 
-#[cfg(feature = "serde-traits")]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
-pub mod serde;
-
-#[cfg(not(feature = "serde-traits"))]
-pub mod serde {
-    //! Serde integration is not enabled, it's available behind `serde-traits` feature flag
-    //!
-    //! This feature provides access to serde's `Serialize`/`Deserialize` trait implementation for [`VoluntaryServitude`]
-    //!
-    //! [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html#implementations
-    //!
-    //! # Enable the feature:
-    //!
-    //! **Cargo.toml**
-    //!
-    //! ```toml
-    //! [dependencies]
-    //! voluntary_servitude = { version = "3", features = "logs" }
-    //! ```
-    //!
-    //! # See full docs:
-    //!
-    //! ```bash
-    //! cargo doc --all-features --open
-    //! ```
-    //!
-    //! # To test integration with serde `serde-tests` must also be enabled
-    //!
-    //! ```bash
-    //! cargo test --features "serde-traits serde-tests"
-    //! ```
-}
+#[cfg(feature = "serde-traits")]
+mod serde;
 
 pub use atomic::Atomic;
 pub use atomic_option::{AtomicOption, NotEmpty};

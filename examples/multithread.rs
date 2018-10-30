@@ -26,7 +26,9 @@ fn main() {
         handlers.push(spawn(move || loop {
             let count = consumer.iter().count();
             println!("{} elements", count);
-            if count >= TOTAL { break };
+            if count >= TOTAL {
+                break;
+            };
         }));
     }
 

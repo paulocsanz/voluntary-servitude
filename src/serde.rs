@@ -1,4 +1,4 @@
-//! Serde's `Serialize`/`Deserialize` trait implementations for [`VoluntaryServitude`] behind the `serde-traits` feature
+//! Serde's `Serialize`/`Deserialize` trait implementations for [`VoluntaryServitude`]
 //!
 //! [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html#implementations
 //!

@@ -1,5 +1,7 @@
-use {VS, VoluntaryServitude};
+//! Integration with rayon
+
 use rayon_lib::prelude::*;
+use {VoluntaryServitude, VS};
 
 impl<T: Send + Sync> VoluntaryServitude<T> {
     /// Parallely Extends [`VS`] like the ParallelExtend trait, but without a mutable reference
