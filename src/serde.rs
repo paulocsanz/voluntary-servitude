@@ -51,6 +51,7 @@ impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for Inner<T> {
     }
 }
 
+#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
 impl<T: Serialize> Serialize for VoluntaryServitude<T> {
     #[inline]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
@@ -61,6 +62,14 @@ impl<T: Serialize> Serialize for VoluntaryServitude<T> {
             sequence.serialize_element(el)?;
         }
         sequence.end()
+    }
+}
+
+#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
+impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
+    #[inline]
+    fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
+        Inner::deserialize(des).map(Self::new)
     }
 }
 

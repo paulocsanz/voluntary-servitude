@@ -6,12 +6,6 @@ use std::sync::{atomic::AtomicPtr, atomic::AtomicUsize, atomic::Ordering, Arc};
 use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::NonNull};
 use {node::Node, FillOnceAtomicOption, Filled, IntoPtr, Iter, NotEmpty};
 
-#[cfg(feature = "serde-traits")]
-use serde_lib::{Deserialize, Deserializer};
-
-#[cfg(feature = "rayon-traits")]
-use rayon_lib::prelude::*;
-
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
 /// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
@@ -218,7 +212,7 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// [`Inner`]: ./struct.Inner.html
     #[inline]
-    fn new(inner: Inner<T>) -> Self {
+    pub(crate) fn new(inner: Inner<T>) -> Self {
         trace!("new()");
         VoluntaryServitude(ArcCell::new(Arc::new(inner)))
     }
@@ -348,34 +342,6 @@ impl<T: Debug> Debug for VoluntaryServitude<T> {
     }
 }
 
-#[cfg(feature = "serde-traits")]
-impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
-    #[inline]
-    fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
-        Inner::deserialize(des).map(Self::new)
-    }
-}
-
-#[cfg(feature = "rayon-traits")]
-impl<T: Send + Sync> FromParallelIterator<T> for VoluntaryServitude<T> {
-    #[inline]
-    fn from_par_iter<I: IntoParallelIterator<Item = T>>(par_iter: I) -> Self {
-        trace!("from_par_iter()");
-        let vs = vs![];
-        par_iter.into_par_iter().for_each(|el| vs.append(el));
-        vs
-    }
-}
-
-#[cfg(feature = "rayon-traits")]
-impl<T: Send + Sync> ParallelExtend<T> for VoluntaryServitude<T> {
-    #[inline]
-    fn par_extend<I: IntoParallelIterator<Item = T>>(&mut self, par_iter: I) {
-        trace!("ParExtend");
-        VS::par_extend(self, par_iter);
-    }
-}
-
 impl<T> Extend<T> for VoluntaryServitude<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
@@ -404,27 +370,6 @@ impl<'a, T: 'a + Copy> FromIterator<&'a T> for VoluntaryServitude<T> {
     }
 }
 
-impl<T: Send + Sync> VoluntaryServitude<T> {
-    /// Parallely Extends [`VS`] like the ParallelExtend trait, but without a mutable reference
-    ///
-    /// [`VS`]: ./type.VS.html
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![1u8, 2, 3];
-    /// list.par_extend(vec![4, 5, 6]);
-    /// assert_eq!(list.iter().sum::<u8>(), 21u8);
-    /// ```
-    #[cfg(feature = "rayon-traits")]
-    #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
-    #[inline]
-    pub fn par_extend<I: IntoParallelIterator<Item = T>>(&self, par_iter: I) {
-        trace!("par_extend()");
-        par_iter.into_par_iter().for_each(|el| self.append(el));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,6 +394,7 @@ mod tests {
 
     #[test]
     fn extend_partial_eq() {
+        setup_logger();
         let vs: VS<u8> = vs![1, 2, 3, 4, 5];
         let iter = vs.iter();
         vs.extend(iter.into_iter().cloned());
@@ -468,14 +414,5 @@ mod tests {
     fn test_sync() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<VoluntaryServitude<()>>();
-    }
-
-    #[cfg(feature = "rayon-traits")]
-    #[test]
-    fn from_par_iter() {
-        let vec = vec![1, 2, 3, 4, 5, 6];
-        let sum: u8 = vec.iter().sum();
-        let vs = VS::from_par_iter(vec);
-        assert_eq!(vs.iter().sum::<u8>(), sum);
     }
 }

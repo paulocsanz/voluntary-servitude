@@ -221,6 +221,10 @@ mod iterator;
 mod node;
 mod voluntary_servitude;
 
+#[cfg(feature = "rayon-traits")]
+#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
+mod rayon;
+
 #[cfg(feature = "serde-traits")]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
 pub mod serde;
