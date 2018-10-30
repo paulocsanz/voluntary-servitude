@@ -51,7 +51,7 @@ impl<'a, T: 'a> Iter<'a, T> {
         self.index
     }
 
-    /// Atomically extracts current size of iterator (may grow, but not decrease)
+    /// Returns current iterator size (may grow, but not decrease)
     ///
     /// If `Iter` is empty it will never grow
     ///
@@ -81,11 +81,11 @@ impl<'a, T: 'a> Iter<'a, T> {
             .map_or_else(|| self.index(), |_| self.inner.len())
     }
 
-    /// Atomically checks if iterator is empty (it will always return the same value)
+    /// Checks if iterator's length is 0 (it will always return the same value)
     ///
-    /// If a iterator is empty, it will never grow
+    /// If the iterator is empty, it will never grow
     ///
-    /// If a iterator is filled, it will never be empty
+    /// If the iterator is filled, it will never be empty
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;

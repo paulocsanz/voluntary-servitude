@@ -174,8 +174,6 @@ impl<T> FillOnceAtomicOption<T> {
     /// [`into_inner`]: #method.into_inner
     /// [`dangle`]: #method.dangle
     /// [`try_store`]: #method.try_store
-    /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
-    /// [`AtomicOption`]: ./struct.AtomicOption.html
     /// [`VS`]: ./type.VS.html
     #[inline]
     pub unsafe fn dangle(&self) -> Option<Box<T>> {

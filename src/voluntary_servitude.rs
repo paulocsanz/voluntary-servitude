@@ -10,8 +10,6 @@ use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
 use serde_lib::{Deserialize, Deserializer};
 
 #[cfg(feature = "rayon-traits")]
-use rayon::ParIter;
-#[cfg(feature = "rayon-traits")]
 use rayon_lib::prelude::*;
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
@@ -81,10 +79,8 @@ impl<T> Inner<T> {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| empty!(self.start(Box::from_raw(first)).err(); "Filled first"))
-            .map(
-                |nn| empty!(nn.as_ref().try_set_next(Box::from_raw(first)).err(); "Last had next"),
-            );
+            .or_else(|| success!(self.start(Box::from_raw(first)), "First").err())
+            .map(|nn| success!(nn.as_ref().set_next(Box::from_raw(first)), "Last"));
 
         info!("Increased size by {}", length);
         let _ = self.size.fetch_add(length, Ordering::SeqCst);
@@ -222,7 +218,7 @@ impl<T> VoluntaryServitude<T> {
         VoluntaryServitude(ArcCell::new(Arc::new(inner)))
     }
 
-    /// Atomically extracts current size, be careful with race conditions when using it
+    /// Returns current size, be careful with race conditions when using it
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -239,7 +235,7 @@ impl<T> VoluntaryServitude<T> {
         self.0.get().len()
     }
 
-    /// Atomically checks if `VS` is empty, be careful with race conditions when using it
+    /// Checks if `VS` is currently empty, be careful with race conditions when using it
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -254,7 +250,7 @@ impl<T> VoluntaryServitude<T> {
         self.0.get().is_empty()
     }
 
-    /// Insert element after last node
+    /// Inserts element after last node
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -312,44 +308,22 @@ impl<T> VoluntaryServitude<T> {
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let list = vs![1, 2, 3];
-    /// list.extend_immutable(vec![4, 5, 6]);
+    /// list.extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     ///
     /// let list = vs![1, 2, 3];
-    /// list.extend_immutable(vs![4, 5, 6].iter().cloned());
+    /// list.extend(vs![4, 5, 6].iter().cloned());
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     ///
     /// let list = vs![1, 2, 3];
-    /// list.extend_immutable(vec![&4, &5, &6].into_iter().cloned());
+    /// list.extend(vec![&4, &5, &6].into_iter().cloned());
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     /// ```
     #[inline]
-    pub fn extend_immutable<I: IntoIterator<Item = T>>(&self, iter: I) {
-        trace!("extend_immutable()");
+    pub fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
+        trace!("extend()");
         let (size, first, last) = Inner::from_iter(iter).into_inner();
         unsafe { self.0.get().append_chain(first, last, size) };
-    }
-
-    /// Parallely Compare `VS` like the `PartialEq` using the ParallelIterator trait, but without needing a mutable reference
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate rayon;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    ///
-    /// let list = vs![1, 2, 3];
-    /// assert!(list.par_eq(vs![1, 2, 3]);
-    /// assert!(!list.par_eq(vs![1, 2, 4]));
-    /// ```should_panic
-    #[cfg(feature = "rayon-traits")]
-    #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
-    #[inline]
-    pub fn par_eq(&self, other: &Self) -> bool {
-        trace!("par_eq()");
-        /*
-        self.par_iter().zip(other.par_iter()).filter(|(s, o)| s == o).count() == self.len();
-        */
-        unimplemented!();
     }
 }
 
@@ -378,18 +352,7 @@ impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
 }
 
 #[cfg(feature = "rayon-traits")]
-impl<'a, T: 'a + Sync + Send> IntoParallelRefIterator<'a> for VoluntaryServitude<T> {
-    type Item = T;
-    type Iter = ParIter<'a, Self::Item>;
-
-    #[inline]
-    fn par_iter(&self) -> Self::Iter {
-        Self::ParIter::new(self.0.get())
-    }
-}
-
-#[cfg(feature = "rayon-traits")]
-impl<T: 'a + Send + Sync> FromParallelIterator<T> for VoluntaryServitude<T> {
+impl<T: Send + Sync> FromParallelIterator<T> for VoluntaryServitude<T> {
     #[inline]
     fn from_par_iter<I: IntoParallelIterator<Item = T>>(par_iter: I) -> Self {
         trace!("from_par_iter()");
@@ -403,24 +366,22 @@ impl<T: 'a + Send + Sync> FromParallelIterator<T> for VoluntaryServitude<T> {
 impl<T: Send + Sync> ParallelExtend<T> for VoluntaryServitude<T> {
     #[inline]
     fn par_extend<I: IntoParallelIterator<Item = T>>(&mut self, par_iter: I) {
-        trace!("par_extend()");
-        let vs = vs![];
-        let vs_ref = &vs;
-        par_iter.into_par_iter().for_each(|el| vs_ref.append(el));
+        trace!("ParExtend");
+        VS::par_extend(self, par_iter);
     }
 }
 
 impl<T> Extend<T> for VoluntaryServitude<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.extend_immutable(iter)
+        VS::extend(self, iter)
     }
 }
 
 impl<'a, T: 'a + Copy> Extend<&'a T> for VoluntaryServitude<T> {
     #[inline]
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
-        self.extend_immutable(iter.into_iter().cloned());
+        VS::extend(self, iter.into_iter().cloned())
     }
 }
 
@@ -445,26 +406,16 @@ impl<T: Send + Sync> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate rayon;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    ///
     /// let list = vs![1, 2, 3];
-    /// list.par_extend_immutable(vec![4, 5, 6]);
-    /// assert_eq!(list.par_iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
-    ///
-    /// let list = vs![1, 2, 3];
-    /// list.extend_immutable(vs![4, 5, 6].par_iter().cloned());
-    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
-    ///
-    /// let list = vs![1, 2, 3];
-    /// list.extend_immutable(vec![&4, &5, &6].into_par_iter().cloned());
+    /// list.par_extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     /// ```
     #[cfg(feature = "rayon-traits")]
     #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
     #[inline]
-    pub fn par_extend_immutable<I: IntoParallelIterator<Item = T>>(&self, par_iter: I) {
-        trace!("par_extend_immutable()");
+    pub fn par_extend<I: IntoParallelIterator<Item = T>>(&self, par_iter: I) {
+        trace!("par_extend()");
         par_iter.into_par_iter().for_each(|el| self.append(el));
     }
 }
@@ -495,7 +446,7 @@ mod tests {
     fn extend_partial_eq() {
         let vs: VS<u8> = vs![1, 2, 3, 4, 5];
         let iter = vs.iter();
-        vs.extend_immutable(iter.into_iter().cloned());
+        vs.extend(iter.into_iter().cloned());
         assert_eq!(
             vs.iter().collect::<Vec<_>>(),
             vec![&1u8, &2, &3, &4, &5, &1, &2, &3, &4, &5]

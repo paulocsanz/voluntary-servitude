@@ -2,8 +2,7 @@
 //!
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::sync::atomic::Ordering;
+use std::{fmt::Debug, fmt::Formatter, fmt::Result as FmtResult, sync::atomic::Ordering};
 use {FillOnceAtomicOption, NotEmpty};
 
 /// One [`VoluntaryServitude`] element
@@ -44,7 +43,7 @@ impl<T> Node<T> {
     /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
     /// [`NotEmpty`]: ./struct.NotEmpty.html
     #[inline]
-    pub fn try_set_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
+    pub fn set_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
         trace!("try_set_next({:p})", node);
         self.next.try_store(node, Ordering::SeqCst)
     }

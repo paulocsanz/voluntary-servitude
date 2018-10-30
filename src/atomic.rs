@@ -1,14 +1,21 @@
 //! Atomic `Box<T>`
 
-use atomic_option::AtomicOption;
 use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
-use std::{marker::PhantomData, ptr::NonNull, sync::atomic::Ordering};
+use std::ptr::{null_mut, NonNull};
+use std::{marker::PhantomData, sync::atomic::AtomicPtr, sync::atomic::Ordering};
+use IntoPtr;
 
 /// Atomic abstractions of a `Box<T>`
 #[derive(Debug)]
-pub struct Atomic<T>(AtomicOption<T>, PhantomData<Box<T>>);
+pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
 
 impl<T> Atomic<T> {
+    /// Inner swap, helper to swap `Atomic` values
+    #[inline]
+    pub fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
+        unsafe { Box::from_raw(self.0.swap(new, order)) }
+    }
+
     /// Creates new `Atomic`
     ///
     /// ```rust
@@ -36,7 +43,7 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn store(&self, new: Box<T>, order: Ordering) {
-        self.0.store(Some(new), order)
+        drop(self.swap(new, order))
     }
 
     /// Stores value into `Atomic` returning old value
@@ -49,7 +56,7 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn swap(&self, new: Box<T>, order: Ordering) -> Box<T> {
-        unwrap_option!(self.0.swap(Some(new), order); "Atomic<T> was null (swap)")
+        self.inner_swap(new.into_ptr(), order)
     }
 
     /// Converts itself into a `Box<T>`
@@ -62,7 +69,7 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn into_inner(self) -> Box<T> {
-        unwrap_option!(self.0.swap(None, Ordering::SeqCst); "Atomic<T> was null (into_inner)")
+        unsafe { self.dangle() }
     }
 
     /// Creates new `Atomic` if pointer is not null (like `NonNull`)
@@ -108,7 +115,7 @@ impl<T> Atomic<T> {
     #[inline]
     pub unsafe fn from_raw_unchecked(ptr: *mut T) -> Self {
         debug!("from_raw_unchecked({:p})", ptr);
-        Atomic(AtomicOption::from_raw(ptr), PhantomData)
+        Atomic(AtomicPtr::new(ptr), PhantomData)
     }
 
     /// Atomically extracts the current stored pointer, this function should probably not be called
@@ -139,7 +146,32 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut T {
-        self.0.get_raw(order)
+        self.0.load(order)
+    }
+
+    /// Empties `Atomic`, this function should probably never be called
+    ///
+    /// You should probably use [`into_inner`]
+    ///
+    /// # Safety
+    ///
+    /// This is extremely unsafe, you don't want to call this unless you are implementing `Drop` for a chained `T`
+    ///
+    /// All reference will endup invalidated and any function call other than [`try_store`] (or dropping) will cause UB
+    ///
+    /// In a multi-thread environment it's very hard to ensure that this won't happen
+    ///
+    /// This is useful to obtain ownership of the inner value and implement a custom drop
+    /// (like a linked list iteratively dropped - [`VS`])
+    ///
+    /// [`into_inner`]: #method.into_inner
+    /// [`dangle`]: #method.dangle
+    /// [`try_store`]: #method.try_store
+    /// [`VS`]: ./type.VS.html
+    #[inline]
+    pub unsafe fn dangle(&self) -> Box<T> {
+        info!("dangle()");
+        self.inner_swap(null_mut(), Ordering::SeqCst)
     }
 }
 
@@ -154,7 +186,7 @@ impl<T> From<Box<T>> for Atomic<T> {
     #[inline]
     fn from(into_ptr: Box<T>) -> Self {
         trace!("From<Box<T>>");
-        Atomic(AtomicOption::from(into_ptr), PhantomData)
+        Atomic(AtomicPtr::from(into_ptr.into_ptr()), PhantomData)
     }
 }
 
@@ -162,6 +194,14 @@ impl<T> Pointer for Atomic<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
+    }
+}
+
+impl<T> Drop for Atomic<T> {
+    #[inline]
+    fn drop(&mut self) {
+        info!("Drop");
+        drop(unsafe { self.dangle() });
     }
 }
 

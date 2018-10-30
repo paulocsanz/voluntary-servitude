@@ -233,8 +233,6 @@ mod iterator;
 mod node;
 mod voluntary_servitude;
 
-#[cfg(feature = "rayon-traits")]
-pub mod rayon;
 #[cfg(feature = "serde-traits")]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
 pub mod serde;
@@ -268,9 +266,6 @@ pub mod serde {
     //! cargo test --features "serde-traits serde-tests"
     //! ```
 }
-
-#[cfg(feature = "rayon-traits")]
-pub use rayon::ParIter;
 
 pub use atomic::Atomic;
 pub use atomic_option::{AtomicOption, NotEmpty};

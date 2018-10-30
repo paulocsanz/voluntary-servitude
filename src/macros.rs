@@ -56,6 +56,7 @@ macro_rules! voluntary_servitude {
     }};
 }
 
+/// Used to tell the compiler this branch is never taken (panics in debug, unreachable in release)
 macro_rules! never {
     ($($x: expr),*) => {{
         #[cfg(debug_assertions)]
@@ -67,10 +68,7 @@ macro_rules! never {
     }}
 }
 
-macro_rules! unwrap_option {
-    ($e: expr; $($x: expr),*) => ($e.unwrap_or_else(|| never!($($x),*)));
-}
-
-macro_rules! empty {
-    ($e: expr; $($x: expr),*) => ($e.map(|_| never!($($x),*)));
+/// Used to tell the compiler `Result` is never `Err` (panics in debug, unreachable in release)
+macro_rules! success {
+    ($res: expr, $($x: expr),*) => ($res.map_err(|_| never!($($x),*)));
 }

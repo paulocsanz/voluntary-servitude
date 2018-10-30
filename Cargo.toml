@@ -23,7 +23,7 @@ rayon = { version = "1", optional = true }
 
 [features]
 default = []
-#rayon-traits = ["rayon"]
+rayon-traits = ["rayon"]
 logs = ["log", "env_logger"]
 serde-traits = ["serde"]
 serde-tests = ["serde_json"]
