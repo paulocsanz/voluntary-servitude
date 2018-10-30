@@ -77,7 +77,7 @@
     while_true
 )]
 #![doc(test(attr(deny(warnings))))]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.1/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.2/voluntary-servitude")]
 
 #[cfg(feature = "rayon-traits")]
 extern crate rayon as rayon_lib;
