@@ -2,8 +2,8 @@
 //!
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
-use std::{fmt::Debug, fmt::Formatter, fmt::Result as FmtResult, sync::atomic::Ordering};
-use {FillOnceAtomicOption, NotEmpty};
+use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::{cell::UnsafeCell, ptr::null_mut, ptr::NonNull};
 
 /// One [`VoluntaryServitude`] element
 ///
@@ -12,7 +12,7 @@ pub struct Node<T> {
     /// Inner value
     value: T,
     /// Next node in chain
-    next: FillOnceAtomicOption<Node<T>>,
+    next: UnsafeCell<*mut Node<T>>,
 }
 
 impl<T> Node<T> {
@@ -27,25 +27,22 @@ impl<T> Node<T> {
     #[inline]
     pub fn new(value: T) -> Self {
         trace!("new()");
-        let next = FillOnceAtomicOption::default();
+        let next = UnsafeCell::new(null_mut());
         Self { value, next }
     }
 
-    /// Atomically extracts ref to next Node
+    /// Gets next pointer (caller must be careful with data races)
     #[inline]
-    pub fn next(&self) -> Option<&Self> {
+    pub unsafe fn next(&self) -> Option<NonNull<Self>> {
         trace!("next()");
-        self.next.get_ref(Ordering::SeqCst)
+        NonNull::new(*self.next.get())
     }
 
-    /// If [`FillOnceAtomicOption`] was empty it will fill it and return None, otherwise return the [`NotEmpty`] error
-    ///
-    /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
-    /// [`NotEmpty`]: ./struct.NotEmpty.html
+    /// Inserts next as if there was None (caller must be careful with data races)
     #[inline]
-    pub fn set_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
-        trace!("try_set_next({:p})", node);
-        self.next.try_store(node, Ordering::SeqCst)
+    pub unsafe fn set_next(&self, node: *mut Self) {
+        trace!("set_next({:p})", node);
+        *self.next.get() = node;
     }
 }
 
@@ -53,10 +50,10 @@ impl<T> Node<T> {
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
         info!("Drop chained nodes");
-        let mut node = unsafe { self.next.dangle() };
-        while let Some(n) = node.take() {
-            let next = unsafe { n.next.dangle() };
-            drop(n);
+        let mut node = unsafe { self.next() };
+        while let Some(nn) = node {
+            let mut next = unsafe { nn.as_ref().next() };
+            drop(next.as_mut());
             node = next;
         }
         debug!("Dropped all chained nodes");
@@ -68,7 +65,7 @@ impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         f.debug_struct("Node")
             .field("value", &self.value)
-            .field("next", &self.next.get_raw(Ordering::SeqCst))
+            .field("next", unsafe { &(*self.next.get()) })
             .finish()
     }
 }

@@ -248,35 +248,3 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
         self.map_or(null_mut(), Box::into_raw)
     }
 }
-
-/// Trait to make easier removing impossible branchs from first-order types
-pub(crate) trait Filled<T> {
-    /// Marks that type is always filled (panics in debug, branch is removed in release)
-    ///
-    /// It will return the inner value
-    unsafe fn filled(self, msg: &str) -> T;
-    /// Marks that type is always filled and returns `Default` of what is expected (panics in debug, branch is removed in release)
-    /// avoids a extra `map(|_| U::default())`
-    unsafe fn filled_default<U: Default>(self, msg: &str) -> U;
-}
-
-impl<T, E> Filled<T> for Result<T, E> {
-    #[inline]
-    #[allow(unused)]
-    unsafe fn filled(self, msg: &str) -> T {
-        self.unwrap_or_else(|_| {
-            #[cfg(debug_assertions)]
-            panic!("{}", msg);
-
-            #[cfg(not(debug_assertions))]
-            ::std::hint::unreachable_unchecked();
-        })
-    }
-
-    #[inline]
-    #[allow(unused)]
-    unsafe fn filled_default<U: Default>(self, msg: &str) -> U {
-        let _ = self.filled(msg);
-        U::default()
-    }
-}

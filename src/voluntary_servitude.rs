@@ -3,8 +3,11 @@
 use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{atomic::AtomicPtr, atomic::AtomicUsize, atomic::Ordering, Arc};
-use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::NonNull};
-use {node::Node, FillOnceAtomicOption, Filled, IntoPtr, Iter, NotEmpty};
+use std::{
+    cell::UnsafeCell, iter::Extend, iter::FromIterator, marker::PhantomData, ptr::drop_in_place,
+};
+use std::{num::NonZeroUsize, ptr::null_mut, ptr::NonNull};
+use {node::Node, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -14,9 +17,23 @@ pub struct Inner<T> {
     /// Number of elements inside `Inner`
     size: AtomicUsize,
     /// First node in `Inner`
-    first_node: FillOnceAtomicOption<Node<T>>,
+    first_node: UnsafeCell<*mut Node<T>>,
     /// Last node in `Inner`
     last_node: AtomicPtr<Node<T>>,
+    /// Marks that we own Node<T>
+    _marker: PhantomData<Node<T>>,
+}
+
+unsafe impl<T: Sync> Sync for Inner<T> {}
+unsafe impl<T: Send> Send for Inner<T> {}
+
+impl<T> Drop for Inner<T> {
+    #[inline]
+    fn drop(&mut self) {
+        let _ = self
+            .first_node()
+            .map(|nn| unsafe { drop_in_place(nn.as_ptr()) });
+    }
 }
 
 impl<T> Default for Inner<T> {
@@ -24,8 +41,9 @@ impl<T> Default for Inner<T> {
     fn default() -> Self {
         Self {
             size: AtomicUsize::default(),
-            first_node: FillOnceAtomicOption::default(),
+            first_node: UnsafeCell::new(null_mut()),
             last_node: AtomicPtr::default(),
+            _marker: PhantomData,
         }
     }
 }
@@ -34,7 +52,8 @@ impl<T> Inner<T> {
     /// Atomically extracts pointer to first node
     #[inline]
     pub fn first_node(&self) -> Option<NonNull<Node<T>>> {
-        let nn = NonNull::new(self.first_node.get_raw(Ordering::SeqCst));
+        let nn = NonZeroUsize::new(self.len())
+            .and_then(|_| NonNull::new(unsafe { *self.first_node.get() }));
         trace!("first_node() = {:?}", nn);
         nn
     }
@@ -53,11 +72,11 @@ impl<T> Inner<T> {
         self.len() == 0
     }
 
-    /// Tries to insert first element
     #[inline]
-    fn start(&self, boxed: Box<Node<T>>) -> Result<(), NotEmpty> {
-        trace!("start({:p})", boxed);
-        self.first_node.try_store(boxed, Ordering::SeqCst)
+    /// Set first node in chain (caller must be careful with data-races)
+    unsafe fn set_first(&self, ptr: *mut Node<T>) {
+        trace!("set_first({:p})", ptr);
+        (*self.first_node.get()) = ptr;
     }
 
     /// Swaps last node, returning old one
@@ -67,14 +86,14 @@ impl<T> Inner<T> {
         NonNull::new(self.last_node.swap(ptr, Ordering::SeqCst))
     }
 
-    #[inline]
     /// Unsafelly append a `Node<T>` chain to `Inner<T>`
+    #[inline]
     pub unsafe fn append_chain(&self, first: *mut Node<T>, last: *mut Node<T>, length: usize) {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| self.start(Box::from_raw(first)).filled_default("First"))
-            .map(|nn| nn.as_ref().set_next(Box::from_raw(first)).filled("Last"));
+            .or_else(|| (self.set_first(first), None).1)
+            .map(|nn| nn.as_ref().set_next(first));
 
         info!("Increased size by {}", length);
         let _ = self.size.fetch_add(length, Ordering::SeqCst);
@@ -83,7 +102,7 @@ impl<T> Inner<T> {
     /// Appends node to end of `Inner` (inserts first_node if it's the first)
     #[inline]
     pub fn append(&self, value: T) {
-        let ptr = Box::into_raw(Box::new(Node::new(value)));
+        let ptr = Node::new(value).into_ptr();
         unsafe { self.append_chain(ptr, ptr, 1) };
     }
 
@@ -91,9 +110,9 @@ impl<T> Inner<T> {
     /// Extracts chain and drops itself without dropping it
     pub fn into_inner(self) -> (usize, *mut Node<T>, *mut Node<T>) {
         trace!("into_inner()");
-        let size = self.size.into_inner();
-        let first = self.first_node.into_inner().into_ptr();
-        let last = self.last_node.into_inner();
+        let size = self.size.load(Ordering::SeqCst);
+        let first = unsafe { *self.first_node.get() };
+        let last = self.last_node.swap(null_mut(), Ordering::SeqCst).into_ptr();
         (size, first, last)
     }
 }
