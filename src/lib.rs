@@ -37,11 +37,11 @@
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`Call this code from C (FFI)`]: ./ffi/index.html
-//! [`System Allocator ("system-alloc" feature)`]: ./static.GLOBAL_ALLOC.html
+//! [`System Allocator ("system-alloc" feature)`]: #statics
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
-//! [`Logging ("logs" feature)`]: ./index.html#functions
+//! [`Logging ("logs" feature)`]: #functions
 
 #![cfg_attr(docs_rs_workaround, feature(allocator_api))]
 #![cfg_attr(docs_rs_workaround, feature(global_allocator))]
@@ -103,18 +103,6 @@ use std::alloc::System;
 #[global_allocator]
 pub static GLOBAL_ALLOC: System = System;
 
-#[cfg(not(feature = "system-alloc"))]
-/// System allocator is not enabled, it's available behind the `system-alloc` feature flag
-///
-/// It's intended to be used by the FFI, but you can use it in rust by setting in Cargo.toml
-///
-/// ```bash
-/// cargo build --release --features "system-alloc"
-/// ```
-///
-/// *`./dist/libvoluntary_servitude.so` (FFI) is compiled with system allocator*
-pub static GLOBAL_ALLOC: () = ();
-
 extern crate crossbeam;
 
 #[macro_use]
@@ -158,47 +146,6 @@ pub fn setup_logger() {
     static STARTED: std::sync::Once = std::sync::ONCE_INIT;
     STARTED.call_once(env_logger::init);
 }
-
-/// Enum impossible to construct (hint that the code is unreachable)
-#[cfg(not(feature = "logs"))]
-#[doc(hidden)]
-#[derive(Debug)]
-pub enum ImpossibleToInstantiate {}
-
-/// Logging is not enabled, it's available behind the `logs` feature flag
-///
-/// When "logs" is set the function `setup_logger` will be available to start logging the execution
-///
-/// # Enable the feature:
-/// **Cargo.toml**
-/// ```toml
-/// [dependencies]
-/// voluntary_servitude = { version = "3", features = "logs" }
-/// ```
-///
-/// # See full docs:
-/// ```bash
-/// cargo doc --all-features --open
-/// ```
-///
-/// # Set the `RUST_LOG` env var:
-/// ```bash
-/// export RUST_LOG=voluntary_servitude=trace
-/// export RUST_LOG=voluntary_servitude=debug
-/// export RUST_LOG=voluntary_servitude=info
-/// export RUST_LOG=voluntary_servitude=warn
-/// export RUST_LOG=voluntary_servitude=error
-/// ```
-///
-/// ```_rust
-/// // Must enable the `logs` feature and set the appropriate `RUST_LOG` env var
-/// voluntary_servitude::setup_logger();
-/// // Call code to be logged
-/// // ...
-/// ```
-#[cfg(not(feature = "logs"))]
-#[inline]
-pub fn setup_logger(_: ImpossibleToInstantiate) {}
 
 /// Remove logging macros when they are disabled (at compile time)
 #[macro_use]
