@@ -75,7 +75,7 @@
     while_true
 )]
 #![doc(test(attr(deny(warnings))))]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.0/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.1/voluntary-servitude")]
 
 #[cfg(feature = "serde-traits")]
 extern crate serde as serde_lib;
