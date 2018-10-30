@@ -1,5 +1,5 @@
 LIBDIR=../dist
-FLAGS=-Wall -Wextra -Wpedantic
+FLAGS=-Wall -Wextra -Wpedantic -Werror -O3 -D_FORTIFY_SOURCE=2 -fvisibility=hidden -fstack-protector -fstack-protector-all
 
 default: all
 

@@ -629,7 +629,7 @@ pub unsafe extern "C" fn vs_destroy(list: *mut VS<*const c_void>) -> u8 {
 #[no_mangle]
 pub unsafe extern "C" fn vs_iter_next(iter: *mut Iter<'_, *const c_void>) -> *const c_void {
     NonNull::new(iter)
-        .and_then(|nn| (*nn.as_ptr()).next().cloned())
+        .and_then(|mut nn| nn.as_mut().next().cloned())
         .unwrap_or(null())
 }
 

@@ -23,14 +23,10 @@ fn main() {
     for _ in 0..CONSUMERS {
         const TOTAL: usize = PRODUCERS * ELEMENTS;
         let consumer = Arc::clone(&list);
-        handlers.push(spawn(move || {
-            while {
-                let count = consumer.iter().count();
-                println!("{} elements", count);
-                // This is just a do-while for demonstration purposes
-                // Don't take it very seriously
-                count < TOTAL
-            } {}
+        handlers.push(spawn(move || loop {
+            let count = consumer.iter().count();
+            println!("{} elements", count);
+            if count >= TOTAL { break };
         }));
     }
 
@@ -39,5 +35,5 @@ fn main() {
         handler.join().expect("Failed to join thread");
     }
 
-    println!("Test ended without errors");
+    println!("Multi-thread rust example ended without errors");
 }

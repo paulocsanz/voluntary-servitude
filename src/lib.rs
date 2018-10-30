@@ -333,8 +333,7 @@ pub(crate) trait Filled<T> {
     /// It will return the inner value
     unsafe fn filled(self, msg: &str) -> T;
     /// Marks that type is always filled and returns `Default` of what is expected (panics in debug, branch is removed in release)
-    ///
-    /// Since rust doesn't have Higher-Kinded Types the best we can do is this, but avoids a `map(|_| U::default())`
+    /// avoids a extra `map(|_| U::default())`
     unsafe fn filled_default<U: Default>(self, msg: &str) -> U;
 }
 
