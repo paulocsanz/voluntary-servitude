@@ -11,9 +11,7 @@ use {node::Node, voluntary_servitude::Inner};
 /// [`VS`]: ./type.VS.html
 #[derive(Debug)]
 pub struct Iter<'a, T: 'a> {
-    /// References `Inner` extracted from [`VS`]
-    ///
-    /// [`VS`]: ./struct.VS.html
+    /// References `Inner` extracted from `VS`
     inner: Arc<Inner<T>>,
     /// Current node in iteration
     current: Option<&'a Node<T>>,
@@ -115,11 +113,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
         trace!("next()");
 
         let data = self.current.map(|node| (node.value(), self.index += 1).0);
-        debug!(
-            "Current: data.is_some() = {}, self.index = {}",
-            data.is_some(),
-            self.index
-        );
+        debug!("{} at {} of {}", data.is_some(), self.index, self.len());
 
         let current = self.current.take().filter(|_| self.index() <= self.len());
         self.current = current.and_then(|node| node.next());
