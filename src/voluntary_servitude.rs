@@ -4,7 +4,7 @@ use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::{atomic::AtomicPtr, atomic::AtomicUsize, atomic::Ordering, Arc};
 use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::NonNull};
-use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
+use {node::Node, FillOnceAtomicOption, Filled, IntoPtr, Iter, NotEmpty};
 
 #[cfg(feature = "serde-traits")]
 use serde_lib::{Deserialize, Deserializer};
@@ -79,8 +79,8 @@ impl<T> Inner<T> {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| success!(self.start(Box::from_raw(first)), "First").err())
-            .map(|nn| success!(nn.as_ref().set_next(Box::from_raw(first)), "Last"));
+            .or_else(|| self.start(Box::from_raw(first)).filled_default("First"))
+            .map(|nn| nn.as_ref().set_next(Box::from_raw(first)).filled("Last"));
 
         info!("Increased size by {}", length);
         let _ = self.size.fetch_add(length, Ordering::SeqCst);
@@ -407,9 +407,9 @@ impl<T: Send + Sync> VoluntaryServitude<T> {
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![1, 2, 3];
+    /// let list = vs![1u8, 2, 3];
     /// list.par_extend(vec![4, 5, 6]);
-    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    /// assert_eq!(list.iter().sum::<u8>(), 21u8);
     /// ```
     #[cfg(feature = "rayon-traits")]
     #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]

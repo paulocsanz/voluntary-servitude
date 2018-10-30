@@ -16,12 +16,14 @@
 ///
 /// let vs = vs![1; 3];
 /// assert_eq!(vs.iter().collect::<Vec<_>>(), vec![&1; 3]);
+/// # let _ = vs![1, 2, 3,];
 /// ```
 #[macro_export]
 macro_rules! vs {
     () => (voluntary_servitude![]);
     ($elem: expr; $n: expr) => (voluntary_servitude![$elem; $n]);
     ($($x: expr),*) => (voluntary_servitude![$($x),*]);
+    ($($x: expr,)*) => (voluntary_servitude![$($x,)*]);
 }
 
 /// Creates new [`VS`] with specified elements as in the `vec!` macro
@@ -40,6 +42,7 @@ macro_rules! vs {
 ///
 /// let vs = voluntary_servitude![1; 3];
 /// assert_eq!(vs.iter().collect::<Vec<_>>(), vec![&1; 3]);
+/// # let _ = voluntary_servitude![1, 2, 3,];
 /// ```
 #[macro_export]
 macro_rules! voluntary_servitude {
@@ -49,26 +52,10 @@ macro_rules! voluntary_servitude {
         let _ = (0..$n).map(|_| vs.append($elem)).count();
         vs
     }};
-    ($($x: expr),*) => {{
+    ($($x: expr),*) => (voluntary_servitude![$($x,)*]);
+    ($($x: expr,)*) => {{
         let vs = $crate::VS::default();
         $(vs.append($x);)*
         vs
     }};
-}
-
-/// Used to tell the compiler this branch is never taken (panics in debug, unreachable in release)
-macro_rules! never {
-    ($($x: expr),*) => {{
-        #[cfg(debug_assertions)]
-        panic!($($x,)*);
-
-        #[cfg(not(debug_assertions))]
-        #[allow(unused_unsafe)]
-        unsafe { ::std::hint::unreachable_unchecked() };
-    }}
-}
-
-/// Used to tell the compiler `Result` is never `Err` (panics in debug, unreachable in release)
-macro_rules! success {
-    ($res: expr, $($x: expr),*) => ($res.map_err(|_| never!($($x),*)));
 }

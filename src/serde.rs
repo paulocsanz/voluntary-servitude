@@ -35,10 +35,8 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
 
     #[inline]
     fn visit_seq<A: SeqAccess<'a>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let inner = Inner::<T>::default();
-        while let Some(value) = seq.next_element()? {
-            inner.append(value);
-        }
+        let inner: Inner<T> = Inner::default();
+        let _ = seq.next_element()?.map(|value| inner.append(value));
         Ok(inner)
     }
 }
