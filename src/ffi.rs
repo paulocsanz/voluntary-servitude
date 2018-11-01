@@ -181,6 +181,18 @@
 use std::{ptr::drop_in_place, os::raw::c_void, ptr::null, ptr::NonNull};
 use {IntoPtr, Iter, VS};
 
+/// [`VoluntaryServitude`]'s representation in C
+///
+/// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
+#[allow(non_camel_case_types)]
+pub type vs_t = VS<*const c_void>;
+
+/// [`Iter`]'s representation in C
+///
+/// [`Iter`]: ./struct.Iter.html
+#[allow(non_camel_case_types)]
+pub type vs_iter_t<'a> = Iter<'a, *const c_void>;
+
 /// Initializes logger according to `RUST_LOG` env var (exists behind the `logs` feature)
 ///
 /// ```bash
@@ -240,7 +252,7 @@ pub unsafe extern "C" fn initialize_logger() {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_new() -> *mut VS<*const c_void> {
+pub unsafe extern "C" fn vs_new() -> *mut vs_t {
     vs![].into_ptr()
 }
 
@@ -312,7 +324,7 @@ pub unsafe extern "C" fn vs_new() -> *mut VS<*const c_void> {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter<'a>(vs: *mut VS<*const c_void>) -> *mut Iter<'a, *const c_void> {
+pub unsafe extern "C" fn vs_iter<'a>(vs: *mut vs_t) -> *mut vs_iter_t<'a> {
     NonNull::new(vs).map(|nn| (&*nn.as_ptr()).iter()).into_ptr()
 }
 
@@ -369,8 +381,8 @@ pub unsafe extern "C" fn vs_iter<'a>(vs: *mut VS<*const c_void>) -> *mut Iter<'a
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_len(vs: *const VS<*const c_void>) -> usize {
-    NonNull::new(vs as *mut VS<*const c_void>).map_or(0, |nn| nn.as_ref().len())
+pub unsafe extern "C" fn vs_len(vs: *const vs_t) -> usize {
+    NonNull::new(vs as *mut vs_t).map_or(0, |nn| nn.as_ref().len())
 }
 
 /// Append element to [`VoluntaryServitude`]
@@ -423,7 +435,7 @@ pub unsafe extern "C" fn vs_len(vs: *const VS<*const c_void>) -> usize {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_append(vs: *mut VS<*const c_void>, element: *const c_void) -> u8 {
+pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 {
     NonNull::new(vs)
         .and_then(|vs| NonNull::new(element as *mut c_void).map(|el| (vs, el)))
         .map_or(1, |(vs, el)| (vs.as_ref().append(el.as_ptr()), 0).1)
@@ -480,7 +492,7 @@ pub unsafe extern "C" fn vs_append(vs: *mut VS<*const c_void>, element: *const c
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_clear(vs: *mut VS<*const c_void>) -> u8 {
+pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
     NonNull::new(vs).map_or(1, |nn| (nn.as_ref().clear(), 0).1)
 }
 
@@ -539,7 +551,7 @@ pub unsafe extern "C" fn vs_clear(vs: *mut VS<*const c_void>) -> u8 {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_destroy(list: *mut VS<*const c_void>) -> u8 {
+pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
     NonNull::new(list).map_or(1, |nn| (drop_in_place(nn.as_ptr()), 0).1)
 }
 
@@ -627,7 +639,7 @@ pub unsafe extern "C" fn vs_destroy(list: *mut VS<*const c_void>) -> u8 {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_next(iter: *mut Iter<'_, *const c_void>) -> *const c_void {
+pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void {
     NonNull::new(iter)
         .and_then(|mut nn| nn.as_mut().next().cloned())
         .unwrap_or(null())
@@ -729,8 +741,8 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut Iter<'_, *const c_void>) -> *co
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_len(iter: *const Iter<'_, *const c_void>) -> usize {
-    NonNull::new(iter as *mut Iter<'_, *const c_void>).map_or(0, |nn| nn.as_ref().len())
+pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t<'_>) -> usize {
+    NonNull::new(iter as *mut vs_iter_t<'_>).map_or(0, |nn| nn.as_ref().len())
 }
 
 /// Returns current [`Iter`] index
@@ -807,8 +819,8 @@ pub unsafe extern "C" fn vs_iter_len(iter: *const Iter<'_, *const c_void>) -> us
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_index(iter: *const Iter<'_, *const c_void>) -> usize {
-    NonNull::new(iter as *mut Iter<'_, *const c_void>).map_or(0, |nn| nn.as_ref().index())
+pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
+    NonNull::new(iter as *mut vs_iter_t<'_>).map_or(0, |nn| nn.as_ref().index())
 }
 
 /// Free [`Iter`] (can happen after [`VoluntaryServitude`]'s free)
@@ -858,6 +870,6 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const Iter<'_, *const c_void>) -> 
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_destroy(iter: *mut Iter<'_, *const c_void>) -> u8 {
+pub unsafe extern "C" fn vs_iter_destroy(iter: *mut vs_iter_t<'_>) -> u8 {
     NonNull::new(iter).map_or(1, |nn| (drop_in_place(nn.as_ptr()), 0).1)
 }
