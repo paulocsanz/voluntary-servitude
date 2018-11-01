@@ -2,11 +2,9 @@
 
 use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::sync::{atomic::AtomicPtr, atomic::AtomicUsize, atomic::Ordering, Arc};
-use std::{
-    cell::UnsafeCell, iter::Extend, iter::FromIterator, marker::PhantomData, ptr::drop_in_place,
-};
-use std::{num::NonZeroUsize, ptr::null_mut, ptr::NonNull};
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::{cell::UnsafeCell, iter::Extend, iter::FromIterator, marker::PhantomData};
+use std::{num::NonZeroUsize, ptr::drop_in_place, ptr::null_mut, ptr::NonNull, sync::Arc};
 use {node::Node, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety

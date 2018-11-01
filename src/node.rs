@@ -3,7 +3,7 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::{cell::UnsafeCell, ptr::null_mut, ptr::NonNull};
+use std::{cell::UnsafeCell, ptr::null_mut, ptr::NonNull, ptr::drop_in_place};
 
 /// One [`VoluntaryServitude`] element
 ///
@@ -19,7 +19,7 @@ impl<T> Node<T> {
     /// Returns reference to inner value
     #[inline]
     pub fn value(&self) -> &T {
-        trace!("value() = {:p}", &self.value as *const T);
+        trace!("value() = {:p}", &self.value);
         &self.value
     }
 
@@ -53,7 +53,7 @@ impl<T> Drop for Node<T> {
         let mut node = unsafe { self.next() };
         while let Some(nn) = node {
             let mut next = unsafe { nn.as_ref().next() };
-            drop(next.as_mut());
+            unsafe { drop_in_place(nn.as_ptr()) };
             node = next;
         }
         debug!("Dropped all chained nodes");
