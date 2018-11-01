@@ -65,7 +65,7 @@ fn single_producer_single_consumer() {
 }
 
 #[test]
-fn multi_producers_single_consumer() {
+fn multi_producer_single_consumer() {
     setup_logger();
     let count = 10;
     let list = Arc::new(voluntary_servitude![]);
@@ -99,7 +99,7 @@ fn single_producer_multi_consumer() {
     setup_logger();
     let count = 10000;
     let list = Arc::new(voluntary_servitude![]);
-    let num_consumers = 1000;
+    let num_consumers = 50;
     let mut consumers = vec![];
     let finished = Arc::new(AtomicBool::new(false));
 
@@ -132,9 +132,9 @@ fn single_producer_multi_consumer() {
 #[test]
 fn multi_producer_multi_consumer() {
     setup_logger();
-    let count = 10;
+    let count = 1000;
     let list = Arc::new(voluntary_servitude![]);
-    let num_producers = 1000;
+    let num_producers = 50;
     let mut producers = vec![];
     let finished = Arc::new(AtomicUsize::new(0));
 

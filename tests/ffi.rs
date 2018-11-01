@@ -38,9 +38,9 @@ fn null_ptr() {
         let vs = vs_new();
         assert!(!vs.is_null());
 
-        let data: i32 = 1;
-        vs_append(null_mut(), &data as *const i32 as *const c_void);
-        vs_append(vs, &data as *const i32 as *const c_void);
+        static DATA: i32 = 1;
+        vs_append(null_mut(), &DATA as *const i32 as *const c_void);
+        vs_append(vs, &DATA as *const i32 as *const c_void);
         assert_eq!(vs_len(null_mut()), 0);
         assert_eq!(vs_len(vs), 1);
 
@@ -49,7 +49,7 @@ fn null_ptr() {
         assert!(!iter.is_null());
         assert_eq!(vs_iter_index(iter), 0);
         assert_eq!(vs_iter_len(iter), 1);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
         assert_eq!(vs_iter_index(iter), 1);
         assert_eq!(vs_iter_next(iter), null_mut());
         vs_iter_destroy(iter);
@@ -88,52 +88,54 @@ fn iter() {
         assert_eq!(vs_len(new), 0);
         assert_eq!(vs_iter_len(iter), 0);
 
-        let data: i32 = 32;
+        static DATA: i32 = 32;
         assert_eq!(vs_iter_len(iter), 0);
-        vs_append(new, &data as *const i32 as *const c_void);
+        vs_append(new, &DATA as *const i32 as *const c_void);
         assert_eq!(vs_iter_len(iter), 0);
         assert_eq!(vs_len(new), 1);
 
         vs_iter_destroy(iter);
         let iter = vs_iter(new);
-        vs_append(new, &data as *const i32 as *const c_void);
+        vs_append(new, &DATA as *const i32 as *const c_void);
         assert_eq!(vs_iter_len(iter), 2);
         assert_eq!(vs_iter_index(iter), 0);
         assert_eq!(vs_len(new), 2);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
         assert_eq!(vs_iter_index(iter), 1);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
         assert!(vs_iter_next(iter).is_null());
         assert_eq!(vs_iter_index(iter), 2);
         vs_iter_destroy(iter);
 
-        let data2: i32 = 10;
+        static DATA2: i32 = 10;
         let iter = vs_iter(new);
         assert_eq!(vs_iter_len(iter), 2);
-        vs_append(new, &data2 as *const i32 as *const c_void);
-        vs_append(new, &data as *const i32 as *const c_void);
-        vs_append(new, &data2 as *const i32 as *const c_void);
+        vs_append(new, &DATA2 as *const i32 as *const c_void);
+        vs_append(new, &DATA as *const i32 as *const c_void);
+        vs_append(new, &DATA2 as *const i32 as *const c_void);
         assert_eq!(vs_iter_len(iter), 5);
         assert_eq!(vs_len(new), 5);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data2);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data2);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA2);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA2);
         assert!(vs_iter_next(iter).is_null());
 
+        vs_iter_destroy(iter);
         let iter = vs_iter(new);
         vs_clear(new);
         assert_eq!(vs_len(new), 0);
 
         assert_eq!(vs_iter_len(iter), 5);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data2);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data);
-        assert_eq!(*(vs_iter_next(iter) as *const i32), data2);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA2);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA);
+        assert_eq!(*(vs_iter_next(iter) as *const i32), DATA2);
         assert!(vs_iter_next(iter).is_null());
 
+        vs_iter_destroy(iter);
         let iter = vs_iter(new);
         assert!(vs_iter_next(iter).is_null());
         assert_eq!(vs_iter_len(iter), 0);
