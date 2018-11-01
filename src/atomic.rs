@@ -109,7 +109,7 @@ impl<T> Atomic<T> {
     /// let filled = unsafe { Atomic::from_raw_unchecked(Box::into_raw(Box::new(10))) };
     /// assert_eq!(*filled.into_inner(), 10);
     ///
-    /// // Will cause UB if you use the value in empty (other than storing to it)
+    /// // It's UB for `ptr` to be `null_mut()`
     /// // let empty = unsafe { Atomic::<()>::from_raw_unchecked(null_mut()) };
     /// ```
     #[inline]

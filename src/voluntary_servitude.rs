@@ -4,7 +4,7 @@ use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::{cell::UnsafeCell, iter::Extend, iter::FromIterator, marker::PhantomData};
-use std::{num::NonZeroUsize, ptr::drop_in_place, ptr::null_mut, ptr::NonNull, sync::Arc};
+use std::{num::NonZeroUsize, mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc, ptr::swap_nonoverlapping};
 use {node::Node, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
@@ -30,7 +30,7 @@ impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
         let _ = self
             .first_node()
-            .map(|nn| unsafe { drop_in_place(nn.as_ptr()) });
+            .map(|nn| unsafe { drop(Box::from_raw(nn.as_ptr())) });
     }
 }
 
@@ -108,8 +108,9 @@ impl<T> Inner<T> {
     /// Extracts chain and drops itself without dropping it
     pub fn into_inner(self) -> (usize, *mut Node<T>, *mut Node<T>) {
         trace!("into_inner()");
-        let size = self.size.load(Ordering::SeqCst);
-        let first = unsafe { *self.first_node.get() };
+        let size = self.size.swap(0, Ordering::SeqCst);
+        let mut first = null_mut();
+        unsafe { swap_nonoverlapping(&mut first, self.first_node.get(), 1) };
         let last = self.last_node.swap(null_mut(), Ordering::SeqCst).into_ptr();
         (size, first, last)
     }

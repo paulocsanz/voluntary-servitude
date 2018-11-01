@@ -178,7 +178,7 @@
 //! }
 //! ```
 
-use std::{ptr::drop_in_place, os::raw::c_void, ptr::null, ptr::NonNull};
+use std::{mem::drop, os::raw::c_void, ptr::null, ptr::NonNull};
 use {IntoPtr, Iter, VS};
 
 /// [`VoluntaryServitude`]'s representation in C
@@ -552,7 +552,7 @@ pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
-    NonNull::new(list).map_or(1, |nn| (drop_in_place(nn.as_ptr()), 0).1)
+    NonNull::new(list).map_or(1, |nn| (drop(Box::from_raw(nn.as_ptr())), 0).1)
 }
 
 /// Obtains next element in [`Iter`], returns `NULL` if there are no more elements
@@ -871,5 +871,5 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vs_iter_destroy(iter: *mut vs_iter_t<'_>) -> u8 {
-    NonNull::new(iter).map_or(1, |nn| (drop_in_place(nn.as_ptr()), 0).1)
+    NonNull::new(iter).map_or(1, |nn| (drop(Box::from_raw(nn.as_ptr())), 0).1)
 }

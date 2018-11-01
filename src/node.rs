@@ -3,7 +3,7 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::{cell::UnsafeCell, ptr::null_mut, ptr::NonNull, ptr::drop_in_place};
+use std::{cell::UnsafeCell, ptr::null_mut, ptr::NonNull, mem::drop, ptr::swap_nonoverlapping};
 
 /// One [`VoluntaryServitude`] element
 ///
@@ -50,10 +50,12 @@ impl<T> Node<T> {
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
         info!("Drop chained nodes");
-        let mut node = unsafe { self.next() };
-        while let Some(nn) = node {
-            let mut next = unsafe { nn.as_ref().next() };
-            unsafe { drop_in_place(nn.as_ptr()) };
+        let mut node = null_mut();
+        unsafe { swap_nonoverlapping(&mut node, self.next.get(), 1) };
+        while let Some(nn) = NonNull::new(node) {
+            let mut next = null_mut();
+            unsafe { swap_nonoverlapping(&mut next, nn.as_ref().next.get(), 1) };
+            unsafe { drop(Box::from_raw(nn.as_ptr())) };
             node = next;
         }
         debug!("Dropped all chained nodes");
