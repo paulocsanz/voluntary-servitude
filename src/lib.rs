@@ -4,7 +4,7 @@
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
-//!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature`]
+//!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Call this code from C (FFI)`] (also in **./examples**)
 //!  - [`System Allocator ("system-alloc" feature)`]
 //!  - [`Logging ("logs" feature)`]
@@ -20,7 +20,7 @@
 //!
 //! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations
 //!
-//! A safe `AtomicArc` is impossible, so you must use `ArcCell` from crossbeam (locks to clone) or [`FillOnceAtomicArc`]
+//! A safe `AtomicArc` is impossible without a GC, so you must use `ArcCell` from crossbeam (locks to clone) or [`FillOnceAtomicArc`]
 //!
 //! # Thread-safe appendable list that can create a lock-free iterator
 //!  - [`VoluntaryServitude`] (also called [`VS`])
@@ -35,7 +35,7 @@
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
-//! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature`]: ./struct.VoluntaryServitude.html#impl-1
+//! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`Call this code from C (FFI)`]: ./ffi/index.html
 //! [`System Allocator ("system-alloc" feature)`]: #statics
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
