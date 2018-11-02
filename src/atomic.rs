@@ -1,7 +1,7 @@
 //! Atomic `Box<T>`
 
 use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
-use std::ptr::{null_mut, NonNull};
+use std::ptr::{null_mut, NonNull, drop_in_place};
 use std::{marker::PhantomData, sync::atomic::AtomicPtr, sync::atomic::Ordering};
 use IntoPtr;
 
@@ -197,7 +197,8 @@ impl<T> Drop for Atomic<T> {
     #[inline]
     fn drop(&mut self) {
         info!("Drop");
-        drop(unsafe { self.dangle() });
+        let _ = NonNull::new(self.0.swap(null_mut(), Ordering::SeqCst))
+            .map(|nn| unsafe { drop_in_place(nn.as_ptr()) });
     }
 }
 
