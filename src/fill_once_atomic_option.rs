@@ -185,7 +185,7 @@ impl<T> FillOnceAtomicOption<T> {
 impl<T> Default for FillOnceAtomicOption<T> {
     #[inline]
     fn default() -> Self {
-        Self::new(None);
+        Self::new(None)
     }
 }
 

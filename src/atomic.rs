@@ -68,7 +68,7 @@ impl<T> Atomic<T> {
     /// assert_eq!(*ten.into_inner(), 10);
     /// ```
     #[inline]
-    pub fn into_inner(self) -> Box<T> {
+    pub fn into_inner(mut self) -> Box<T> {
         unsafe { self.dangle() }
     }
 

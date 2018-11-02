@@ -124,15 +124,14 @@ impl<T> FillOnceAtomicArc<T> {
 
     /// Atomically extracts the stored pointer
     ///
-    /// If pointer returned is not null it's safe to deref as long as you don't drop the `FillOnceAtomicArc` or call [`dangle`] in it
+    /// If pointer returned is not null it's safe to deref as long as you don't drop the `FillOnceAtomicArc`
     ///
     /// # Safety
     ///
-    /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicArc` wasn't dropped and [`dangle`] was not called
+    /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicArc` wasn't dropped
     ///
-    /// Returns `null` if `FillOnceAtomicArc` is empty (was not initialized or unsafely emptied with [`dangle`] and dropped)
+    /// Returns `null` if `FillOnceAtomicArc` is empty (was not initialized or dropped)
     ///
-    /// [`dangle`]: #method.dangle
     ///
     /// ```rust
     /// # use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
