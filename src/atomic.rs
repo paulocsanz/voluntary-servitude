@@ -12,7 +12,7 @@ pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
 impl<T> Atomic<T> {
     /// Inner swap, helper to swap `Atomic` values
     #[inline]
-    pub fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
+    fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
         unsafe { Box::from_raw(self.0.swap(new, order)) }
     }
 
@@ -157,19 +157,15 @@ impl<T> Atomic<T> {
     ///
     /// This is extremely unsafe, you don't want to call this unless you are implementing `Drop` for a chained `T`
     ///
-    /// All reference will endup invalidated and any function call other than [`try_store`] (or dropping) will cause UB
-    ///
-    /// In a multi-thread environment it's very hard to ensure that this won't happen
+    /// All reference will endup invalidated and any function call other than dropping will cause UB
     ///
     /// This is useful to obtain ownership of the inner value and implement a custom drop
     /// (like a linked list iteratively dropped - [`VS`])
     ///
     /// [`into_inner`]: #method.into_inner
-    /// [`dangle`]: #method.dangle
-    /// [`try_store`]: #method.try_store
     /// [`VS`]: ./type.VS.html
     #[inline]
-    pub unsafe fn dangle(&self) -> Box<T> {
+    pub unsafe fn dangle(&mut self) -> Box<T> {
         info!("dangle()");
         self.inner_swap(null_mut(), Ordering::SeqCst)
     }

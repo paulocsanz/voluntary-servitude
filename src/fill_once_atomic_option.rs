@@ -176,7 +176,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// [`try_store`]: #method.try_store
     /// [`VS`]: ./type.VS.html
     #[inline]
-    pub unsafe fn dangle(&self) -> Option<Box<T>> {
+    pub unsafe fn dangle(&mut self) -> Option<Box<T>> {
         info!("dangle()");
         self.0.swap(None, Ordering::SeqCst)
     }
@@ -185,7 +185,7 @@ impl<T> FillOnceAtomicOption<T> {
 impl<T> Default for FillOnceAtomicOption<T> {
     #[inline]
     fn default() -> Self {
-        Self::from(Option::<Box<T>>::default())
+        Self::new(None);
     }
 }
 
