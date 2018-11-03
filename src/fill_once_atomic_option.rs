@@ -131,15 +131,13 @@ impl<T> FillOnceAtomicOption<T> {
 
     /// Atomically extracts the stored pointer
     ///
-    /// If pointer returned is not null it's safe to deref as long as you don't drop the `FillOnceAtomicOption` or call [`dangle`] in it
+    /// If pointer returned is not null it's safe to deref as long as you don't drop the `FillOnceAtomicOption`
     ///
     /// # Safety
     ///
-    /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicOption` wasn't dropped and [`dangle`] was not called
+    /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicOption` wasn't dropped
     ///
-    /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized or unsafely emptied with [`dangle`] and dropped)
-    ///
-    /// [`dangle`]: #method.dangle
+    /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized or dropped)
     ///
     /// ```rust
     /// # use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};

@@ -115,8 +115,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
         let data = self.current.map(|node| (node.value(), self.index += 1).0);
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
 
-        let current = self.current.take().filter(|_| self.index() <= self.len());
-        self.current = unsafe { current.and_then(|n| n.next()).map(|nn| &*nn.as_ptr()) };
+        self.current = self.current.take().and_then(|n| n.next());
         data
     }
 

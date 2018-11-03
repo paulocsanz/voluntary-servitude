@@ -3,9 +3,9 @@
 use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{cell::UnsafeCell, iter::Extend, iter::FromIterator, marker::PhantomData};
-use std::{num::NonZeroUsize, mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc, ptr::swap_nonoverlapping};
-use {node::Node, IntoPtr, Iter};
+use std::{iter::Extend, iter::FromIterator, marker::PhantomData};
+use std::{mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc};
+use {node::Node, FillOnceAtomicOption, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -15,7 +15,7 @@ pub struct Inner<T> {
     /// Number of elements inside `Inner`
     size: AtomicUsize,
     /// First node in `Inner`
-    first_node: UnsafeCell<*mut Node<T>>,
+    first_node: FillOnceAtomicOption<Node<T>>,
     /// Last node in `Inner`
     last_node: AtomicPtr<Node<T>>,
     /// Marks that we own Node<T>
@@ -25,21 +25,12 @@ pub struct Inner<T> {
 unsafe impl<T: Sync> Sync for Inner<T> {}
 unsafe impl<T: Send> Send for Inner<T> {}
 
-impl<T> Drop for Inner<T> {
-    #[inline]
-    fn drop(&mut self) {
-        let _ = self
-            .first_node()
-            .map(|nn| unsafe { drop(Box::from_raw(nn.as_ptr())) });
-    }
-}
-
 impl<T> Default for Inner<T> {
     #[inline]
     fn default() -> Self {
         Self {
             size: AtomicUsize::default(),
-            first_node: UnsafeCell::new(null_mut()),
+            first_node: FillOnceAtomicOption::default(),
             last_node: AtomicPtr::default(),
             _marker: PhantomData,
         }
@@ -50,8 +41,7 @@ impl<T> Inner<T> {
     /// Atomically extracts pointer to first node
     #[inline]
     pub fn first_node(&self) -> Option<NonNull<Node<T>>> {
-        let nn = NonZeroUsize::new(self.len())
-            .and_then(|_| NonNull::new(unsafe { *self.first_node.get() }));
+        let nn = NonNull::new(self.first_node.get_raw(Ordering::SeqCst));
         trace!("first_node() = {:?}", nn);
         nn
     }
@@ -71,10 +61,11 @@ impl<T> Inner<T> {
     }
 
     #[inline]
-    /// Set first node in chain (caller must be careful with data-races)
-    unsafe fn set_first(&self, ptr: *mut Node<T>) {
-        trace!("set_first({:p})", ptr);
-        (*self.first_node.get()) = ptr;
+    /// Set first node in chain
+    fn set_first(&self, node: Box<Node<T>>) {
+        trace!("set_first({:p})", node);
+        let _ret = self.first_node.try_store(node, Ordering::SeqCst);
+        debug_assert!(_ret.is_ok());
     }
 
     /// Swaps last node, returning old one
@@ -90,8 +81,8 @@ impl<T> Inner<T> {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| (self.set_first(first), None).1)
-            .map(|nn| nn.as_ref().set_next(first));
+            .or_else(|| (self.set_first(Box::from_raw(first)), None).1)
+            .map(|nn| nn.as_ref().set_next(Box::from_raw(first)));
 
         info!("Increased size by {}", length);
         let _ = self.size.fetch_add(length, Ordering::SeqCst);
@@ -106,11 +97,10 @@ impl<T> Inner<T> {
 
     #[inline]
     /// Extracts chain and drops itself without dropping it
-    pub fn into_inner(self) -> (usize, *mut Node<T>, *mut Node<T>) {
+    pub fn into_inner(mut self) -> (usize, *mut Node<T>, *mut Node<T>) {
         trace!("into_inner()");
         let size = self.size.swap(0, Ordering::SeqCst);
-        let mut first = null_mut();
-        unsafe { swap_nonoverlapping(&mut first, self.first_node.get(), 1) };
+        let first = unsafe { self.first_node.dangle().into_ptr() };
         let last = self.last_node.swap(null_mut(), Ordering::SeqCst).into_ptr();
         (size, first, last)
     }
@@ -184,7 +174,7 @@ impl<T> FromIterator<T> for Inner<T> {
 ///
 /// const CONSUMERS: usize = 8;
 /// const PRODUCERS: usize = 4;
-/// const ELEMENTS: usize = 10000000;
+/// const ELEMENTS: usize = 10_000_000;
 ///
 /// fn main() {
 ///     let list = Arc::new(vs![]);

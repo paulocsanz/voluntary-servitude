@@ -1,8 +1,8 @@
 //! Atomic `Box<T>`
 
 use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
-use std::ptr::{null_mut, NonNull, drop_in_place};
-use std::{marker::PhantomData, sync::atomic::AtomicPtr, sync::atomic::Ordering};
+use std::ptr::{null_mut, NonNull};
+use std::{marker::PhantomData, sync::atomic::AtomicPtr, sync::atomic::Ordering, mem::drop};
 use IntoPtr;
 
 /// Atomic abstractions of a `Box<T>`
@@ -12,8 +12,8 @@ pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
 impl<T> Atomic<T> {
     /// Inner swap, helper to swap `Atomic` values
     #[inline]
-    fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
-        unsafe { Box::from_raw(self.0.swap(new, order)) }
+    unsafe fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
+        Box::from_raw(self.0.swap(new, order))
     }
 
     /// Creates new `Atomic`
@@ -56,7 +56,7 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn swap(&self, new: Box<T>, order: Ordering) -> Box<T> {
-        self.inner_swap(new.into_ptr(), order)
+        unsafe { self.inner_swap(new.into_ptr(), order) }
     }
 
     /// Converts itself into a `Box<T>`
@@ -68,8 +68,8 @@ impl<T> Atomic<T> {
     /// assert_eq!(*ten.into_inner(), 10);
     /// ```
     #[inline]
-    pub fn into_inner(mut self) -> Box<T> {
-        unsafe { self.dangle() }
+    pub fn into_inner(self) -> Box<T> {
+        unsafe { self.inner_swap(null_mut(), Ordering::SeqCst) }
     }
 
     /// Creates new `Atomic` if pointer is not null (like `NonNull`)
@@ -198,7 +198,7 @@ impl<T> Drop for Atomic<T> {
     fn drop(&mut self) {
         info!("Drop");
         let _ = NonNull::new(self.0.swap(null_mut(), Ordering::SeqCst))
-            .map(|nn| unsafe { drop_in_place(nn.as_ptr()) });
+            .map(|nn| drop(unsafe { Box::from_raw(nn.as_ptr()) }));
     }
 }
 
