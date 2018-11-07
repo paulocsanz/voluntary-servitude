@@ -2,7 +2,7 @@
 
 use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
 use std::ptr::{null_mut, NonNull};
-use std::{marker::PhantomData, sync::atomic::AtomicPtr, sync::atomic::Ordering, mem::drop};
+use std::{marker::PhantomData, mem::drop, sync::atomic::AtomicPtr, sync::atomic::Ordering};
 use IntoPtr;
 
 /// Atomic abstractions of a `Box<T>`

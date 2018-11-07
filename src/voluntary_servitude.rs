@@ -3,8 +3,8 @@
 use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc, iter::Extend, iter::FromIterator};
-use {node::Node, FillOnceAtomicOption, IntoPtr, Iter};
+use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc};
+use {node::Node, FillOnceAtomicOption, IgnoreValue, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -78,7 +78,7 @@ impl<T> Inner<T> {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| (self.set_first(Box::from_raw(first)), None).1)
+            .or_else(|| self.set_first(Box::from_raw(first)).into_none())
             .map(|nn| nn.as_ref().set_next(Box::from_raw(first)));
 
         info!("Increased size by {}", length);

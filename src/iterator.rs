@@ -3,8 +3,8 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 
-use std::sync::Arc;
-use {node::Node, voluntary_servitude::Inner};
+use std::{ops::AddAssign, sync::Arc};
+use {node::Node, voluntary_servitude::Inner, IgnoreValue};
 
 /// Lock-free iterator based on [`VS`]
 ///
@@ -75,8 +75,7 @@ impl<'a, T: 'a> Iter<'a, T> {
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
-        self.current
-            .map_or_else(|| self.index(), |_| self.inner.len())
+        self.current.map_or(self.index, |_| self.inner.len())
     }
 
     /// Checks if iterator's length is 0 (it will always return the same value)
@@ -112,7 +111,10 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         trace!("next()");
 
-        let data = self.current.map(|node| (node.value(), self.index += 1).0);
+        let data = self
+            .current
+            .filter(|_| self.index.add_assign(1).into_true())
+            .map(|node| node.value());
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
 
         self.current = self.current.take().and_then(|n| n.next());

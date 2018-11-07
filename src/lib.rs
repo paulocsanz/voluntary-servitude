@@ -224,3 +224,27 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
         self.map_or(null_mut(), Box::into_raw)
     }
 }
+
+pub(crate) trait IgnoreValue {
+    fn into_none<U: Default>(&self) -> U {
+        U::default()
+    }
+
+    fn into_default<U: Default>(&self) -> U {
+        U::default()
+    }
+
+    fn into_zero<U: Default>(&self) -> U {
+        U::default()
+    }
+
+    fn into_false(&self) -> bool {
+        false
+    }
+
+    fn into_true(&self) -> bool {
+        true
+    }
+}
+
+impl<T> IgnoreValue for T {}
