@@ -3,7 +3,7 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::{mem::drop, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 use FillOnceAtomicOption;
 
 /// One [`VoluntaryServitude`] element
@@ -43,8 +43,9 @@ impl<T> Node<T> {
     #[inline]
     pub fn set_next(&self, node: Box<Self>) {
         trace!("set_next({:p})", node);
-        let _ret = self.next.try_store(node, Ordering::SeqCst);
-        debug_assert!(_ret.is_ok());
+        #[allow(unused)]
+        let ret = self.next.try_store(node, Ordering::SeqCst);
+        debug_assert!(ret.is_ok());
     }
 }
 
@@ -54,9 +55,7 @@ impl<T> Drop for Node<T> {
         info!("Drop chained nodes");
         let mut node = unsafe { self.next.dangle() };
         while let Some(mut n) = node {
-            let next = unsafe { n.next.dangle() };
-            drop(n);
-            node = next;
+            node = unsafe { n.next.dangle() };
         }
         debug!("Dropped all chained nodes");
     }

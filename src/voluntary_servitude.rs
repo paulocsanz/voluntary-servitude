@@ -3,8 +3,7 @@
 use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{iter::Extend, iter::FromIterator, marker::PhantomData};
-use std::{mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc};
+use std::{mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc, iter::Extend, iter::FromIterator};
 use {node::Node, FillOnceAtomicOption, IntoPtr, Iter};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
@@ -18,8 +17,6 @@ pub struct Inner<T> {
     first_node: FillOnceAtomicOption<Node<T>>,
     /// Last node in `Inner`
     last_node: AtomicPtr<Node<T>>,
-    /// Marks that we own Node<T>
-    _marker: PhantomData<Node<T>>,
 }
 
 unsafe impl<T: Sync> Sync for Inner<T> {}
@@ -32,7 +29,6 @@ impl<T> Default for Inner<T> {
             size: AtomicUsize::default(),
             first_node: FillOnceAtomicOption::default(),
             last_node: AtomicPtr::default(),
-            _marker: PhantomData,
         }
     }
 }
@@ -64,8 +60,9 @@ impl<T> Inner<T> {
     /// Set first node in chain
     fn set_first(&self, node: Box<Node<T>>) {
         trace!("set_first({:p})", node);
-        let _ret = self.first_node.try_store(node, Ordering::SeqCst);
-        debug_assert!(_ret.is_ok());
+        #[allow(unused)]
+        let ret = self.first_node.try_store(node, Ordering::SeqCst);
+        debug_assert!(ret.is_ok());
     }
 
     /// Swaps last node, returning old one
@@ -101,7 +98,7 @@ impl<T> Inner<T> {
         trace!("into_inner()");
         let size = self.size.swap(0, Ordering::SeqCst);
         let first = unsafe { self.first_node.dangle().into_ptr() };
-        let last = self.last_node.swap(null_mut(), Ordering::SeqCst).into_ptr();
+        let last = self.last_node.swap(null_mut(), Ordering::SeqCst);
         (size, first, last)
     }
 }

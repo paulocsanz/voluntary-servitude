@@ -52,10 +52,9 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn try_store(&self, new: Box<T>, order: Ordering) -> Result<(), NotEmpty> {
         let ptr = new.into_ptr();
-        let ret = NonNull::new(self.0.compare_and_swap(null_mut(), ptr, order))
-            .map_or(Ok(()), |_| Err(NotEmpty));
-        trace!("try_store({:p}) = {:?})", ptr, ret);
-        ret
+        let old = NonNull::new(self.0.compare_and_swap(null_mut(), ptr, order));
+        trace!("try_store({:p}) = {:?})", ptr, old);
+        old.map_or(Ok(()), |_| Err(NotEmpty))
     }
 
     /// Stores value into `AtomicOption` and drops old one
@@ -88,9 +87,9 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn swap(&self, new: Option<Box<T>>, order: Ordering) -> Option<Box<T>> {
         let ptr = new.into_ptr();
-        let old = self.0.swap(ptr, order);
+        let old = NonNull::new(self.0.swap(ptr, order));
         trace!("swap({:p}) = {:?}", ptr, old);
-        NonNull::new(old).map(|nn| unsafe { Box::from_raw(nn.as_ptr()) })
+        old.map(|nn| unsafe { Box::from_raw(nn.as_ptr()) })
     }
 
     /// Replaces `AtomicOption` value for `None` returning old value

@@ -185,7 +185,7 @@ pub use fill_once_atomic_option::FillOnceAtomicOption;
 pub use iterator::Iter;
 pub use voluntary_servitude::{VoluntaryServitude, VS};
 
-use std::ptr::{null_mut, NonNull};
+use std::ptr::null_mut;
 
 /// Trait made to simplify conversion between smart pointers and raw pointers
 pub(crate) trait IntoPtr<T> {
@@ -201,27 +201,11 @@ impl<T> IntoPtr<T> for T {
     }
 }
 
-impl<T> IntoPtr<T> for *mut T {
-    #[inline]
-    #[must_use]
-    fn into_ptr(self) -> Self {
-        self
-    }
-}
-
-impl<T> IntoPtr<T> for Option<*mut T> {
+impl<T> IntoPtr<T> for Option<T> {
     #[inline]
     #[must_use]
     fn into_ptr(self) -> *mut T {
-        self.unwrap_or(null_mut())
-    }
-}
-
-impl<T> IntoPtr<T> for Option<NonNull<T>> {
-    #[inline]
-    #[must_use]
-    fn into_ptr(self) -> *mut T {
-        self.map_or(null_mut(), |nn| nn.as_ptr())
+        self.map(Box::new).into_ptr()
     }
 }
 
@@ -230,14 +214,6 @@ impl<T> IntoPtr<T> for Box<T> {
     #[must_use]
     fn into_ptr(self) -> *mut T {
         Self::into_raw(self)
-    }
-}
-
-impl<T> IntoPtr<T> for Option<T> {
-    #[inline]
-    #[must_use]
-    fn into_ptr(self) -> *mut T {
-        self.map_or(null_mut(), |v| v.into_ptr())
     }
 }
 
