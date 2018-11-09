@@ -1,16 +1,24 @@
 //! Atomic `Option<Box<T>>`
 
-use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
+use std::fmt::{Debug, Formatter, Pointer, self, Display};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use std::{marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull};
+use std::{marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull, error::Error};
 use {Atomic, FillOnceAtomicOption, IntoPtr};
 
 /// Happens when you call `try_store` in a already filled [`AtomicOption`]/[`FillOnceAtomicOption`]
 ///
 /// [`AtomicOption`]: ./struct.AtomicOption.html#method.try_store
 /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html#method.try_store
-#[derive(Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub struct NotEmpty;
+
+impl Display for NotEmpty {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "not empty")
+    }
+}
+
+impl Error for NotEmpty {}
 
 /// Atomic abstraction of a `Option<Box<T>>`
 #[derive(Debug)]
@@ -253,7 +261,7 @@ impl<T> From<Atomic<T>> for AtomicOption<T> {
 
 impl<T> Pointer for AtomicOption<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
     }
 }

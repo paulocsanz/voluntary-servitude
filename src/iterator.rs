@@ -9,7 +9,7 @@ use {node::Node, voluntary_servitude::Inner, IgnoreValue};
 /// Lock-free iterator based on [`VS`]
 ///
 /// [`VS`]: ./type.VS.html
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Iter<'a, T: 'a> {
     /// References `Inner` extracted from `VS`
     inner: Arc<Inner<T>>,
