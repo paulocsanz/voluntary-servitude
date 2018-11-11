@@ -306,6 +306,23 @@ impl<T> VoluntaryServitude<T> {
         drop(self.0.set(Arc::new(Inner::default())));
     }
 
+    /// Clears list returning iterator to it
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![3, 2];
+    /// let iter = list.empty();
+    /// assert_eq!(iter.len(), 2);
+    /// assert_eq!(list.len(), 0);
+    /// assert_eq!(list.iter().len(), 0);
+    /// ```
+    #[inline]
+    pub fn empty(&self) -> Iter<T> {
+        debug!("empty()");
+        Iter::new(self.0.set(Arc::new(Inner::default())))
+    }
+
     /// Extends `VS` like the `Extend` trait, but without needing a mutable reference
     ///
     /// ```rust

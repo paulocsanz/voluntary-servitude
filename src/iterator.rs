@@ -22,7 +22,7 @@ pub struct Iter<'a, T: 'a> {
 impl<'a, T: 'a> Iter<'a, T> {
     /// Creates a new lock-free iterator
     #[inline]
-    pub(crate) fn new(inner: Arc<Inner<T>>) -> Iter<'a, T> {
+    pub(crate) fn new(inner: Arc<Inner<T>>) -> Self {
         trace!("new()");
         Self {
             current: inner.first_node().map(|nn| unsafe { &*nn.as_ptr() }),
