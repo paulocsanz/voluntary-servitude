@@ -4,7 +4,7 @@ use crossbeam::sync::ArcCell;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::{iter::Extend, iter::FromIterator, mem::drop, ptr::null_mut, ptr::NonNull, sync::Arc};
-use {node::Node, FillOnceAtomicOption, IgnoreValue, IntoPtr, Iter};
+use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -58,11 +58,11 @@ impl<T> Inner<T> {
 
     #[inline]
     /// Set first node in chain
-    fn set_first(&self, node: Box<Node<T>>) {
+    fn set_first(&self, node: Box<Node<T>>) -> Result<(), NotEmpty> {
         trace!("set_first({:p})", node);
-        #[allow(unused)]
         let ret = self.first_node.try_store(node, Ordering::SeqCst);
         debug_assert!(ret.is_ok());
+        ret
     }
 
     /// Swaps last node, returning old one
@@ -78,7 +78,7 @@ impl<T> Inner<T> {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         let _ = self
             .swap_last(last)
-            .or_else(|| self.set_first(Box::from_raw(first)).into_none())
+            .or_else(|| self.set_first(Box::from_raw(first)).ok().and(None))
             .map(|nn| nn.as_ref().set_next(Box::from_raw(first)));
 
         info!("Increased size by {}", length);

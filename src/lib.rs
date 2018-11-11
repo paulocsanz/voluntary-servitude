@@ -225,26 +225,25 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
     }
 }
 
-pub(crate) trait IgnoreValue {
-    fn into_none<U: Default>(&self) -> U {
-        U::default()
-    }
+/// Abstracts conditional execution
+pub(crate) trait Combinator<T> {
+    /// Runs closure conditionally
+    fn also_run<P: FnMut(&T)>(self, func: P) -> Self;
+}
 
-    fn into_default<U: Default>(&self) -> U {
-        U::default()
-    }
-
-    fn into_zero<U: Default>(&self) -> U {
-        U::default()
-    }
-
-    fn into_false(&self) -> bool {
-        false
-    }
-
-    fn into_true(&self) -> bool {
-        true
+impl<T> Combinator<T> for Option<T> {
+    #[inline]
+    fn also_run<P: FnMut(&T)>(self, mut func: P) -> Self {
+        self.filter(|t| (func(t), true).1)
     }
 }
 
-impl<T> IgnoreValue for T {}
+/// Trait made to convert useless values into useful ones
+pub(crate) trait IntoDefault {
+    /// Converts itself into specified type with default value
+    fn into_default<T: Default>(&self) -> T {
+        T::default()
+    }
+}
+
+impl IntoDefault for () {}

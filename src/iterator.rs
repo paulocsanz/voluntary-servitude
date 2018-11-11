@@ -3,8 +3,8 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 
-use std::{ops::AddAssign, sync::Arc};
-use {node::Node, voluntary_servitude::Inner, IgnoreValue};
+use std::sync::Arc;
+use {node::Node, voluntary_servitude::Inner, Combinator};
 
 /// Lock-free iterator based on [`VS`]
 ///
@@ -111,10 +111,7 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         trace!("next()");
 
-        let data = self
-            .current
-            .filter(|_| self.index.add_assign(1).into_true())
-            .map(|node| node.value());
+        let data = self.current.also_run(|_| self.index += 1).map(Node::value);
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
 
         self.current = self.current.take().and_then(|n| n.next());

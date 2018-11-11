@@ -1,8 +1,8 @@
 //! Atomic `Option<Box<T>>`
 
-use std::fmt::{Debug, Formatter, Pointer, self, Display};
+use std::fmt::{self, Debug, Display, Formatter, Pointer};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use std::{marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull, error::Error};
+use std::{error::Error, marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull};
 use {Atomic, FillOnceAtomicOption, IntoPtr};
 
 /// Happens when you call `try_store` in a already filled [`AtomicOption`]/[`FillOnceAtomicOption`]
