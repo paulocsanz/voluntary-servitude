@@ -4,7 +4,7 @@ FLAGS=-Wall -Wextra -Wpedantic -Werror -O3 -D_FORTIFY_SOURCE=2 -fvisibility=hidd
 default: all
 
 all:
-	cargo build --release
+	RUSTFLAGS=-Cpanic=abort cargo build --release
 	cp ../target/release/libvoluntary_servitude.so $(LIBDIR)
 	strip $(LIBDIR)/libvoluntary_servitude.so
 	$(CC) $(FLAGS) ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
