@@ -6,7 +6,6 @@
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Call this code from C (FFI)`] (also in **./examples**)
-//!  - [`System Allocator ("system-alloc" feature)`]
 //!  - [`Logging ("logs" feature)`]
 //!
 //! # Atomic abstractions
@@ -37,14 +36,11 @@
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`Call this code from C (FFI)`]: ./ffi/index.html
-//! [`System Allocator ("system-alloc" feature)`]: #statics
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
 //! [`Logging ("logs" feature)`]: #functions
 
-#![cfg_attr(docs_rs_workaround, feature(allocator_api))]
-#![cfg_attr(docs_rs_workaround, feature(global_allocator))]
 #![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 #![deny(
     missing_debug_implementations,
@@ -84,24 +80,6 @@ extern crate rayon as rayon_lib;
 
 #[cfg(feature = "serde-traits")]
 extern crate serde as serde_lib;
-
-#[cfg(feature = "system-alloc")]
-use std::alloc::System;
-
-/// Represents the use of the system's allocator instead of rust's default
-///
-/// By default is disabled, but can be enabled with the `system-alloc` feature
-/// It's intended to be used by the FFI, but you can use it in rust by setting in Cargo.toml
-///
-/// ```bash
-/// cargo build --release --features "system-alloc"
-/// ```
-///
-/// *`./dist/libvoluntary_servitude.so` (FFI) is compiled with the system's allocator*
-#[cfg(feature = "system-alloc")]
-#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "system-alloc")))]
-#[global_allocator]
-pub static GLOBAL_ALLOC: System = System;
 
 extern crate crossbeam;
 

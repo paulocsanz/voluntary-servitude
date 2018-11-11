@@ -8,7 +8,6 @@
  - Serde serialization (`serde-traits` feature)
  - `par_extend`, `from_par_iter` rayon implementation
  - Call this code from C (FFI) (also in **./examples**)
- - System Allocator (`system-alloc` feature)
  - Logging (`logs` feature)
 
 # Atomic abstractions

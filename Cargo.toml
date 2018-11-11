@@ -27,7 +27,6 @@ rayon-traits = ["rayon"]
 logs = ["log", "env_logger"]
 serde-traits = ["serde"]
 serde-tests = ["serde_json"]
-system-alloc = []
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docs_rs_workaround"]
