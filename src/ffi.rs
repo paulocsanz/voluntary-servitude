@@ -173,7 +173,7 @@
 //! ```
 
 use std::{mem::drop, os::raw::c_void, ptr::null, ptr::NonNull};
-use {IntoDefault, IntoPtr, Iter, VS};
+use {IntoPtr, Iter, VS, AlsoRun};
 
 /// [`VoluntaryServitude`]'s representation in C
 ///
@@ -432,7 +432,8 @@ pub unsafe extern "C" fn vs_len(vs: *const vs_t) -> usize {
 pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 {
     NonNull::new(vs)
         .and_then(|vs| NonNull::new(element as *mut c_void).map(|el| (vs, el)))
-        .map_or(1, |(vs, el)| vs.as_ref().append(el.as_ptr()).into_default())
+        .also_run(|(vs, el)| vs.as_ref().append(el.as_ptr()))
+        .map_or(1, |_| 0)
 }
 
 /// Removes all elements from [`VoluntaryServitude`] (preserves existing [`Iter`])
@@ -487,7 +488,9 @@ pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
-    NonNull::new(vs).map_or(1, |nn| nn.as_ref().clear().into_default())
+    NonNull::new(vs)
+        .also_run(|nn| nn.as_ref().clear())
+        .map_or(1, |_| 0)
 }
 
 /// Free [`VoluntaryServitude`] (preserves existing [`Iter`])
@@ -546,7 +549,9 @@ pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
-    NonNull::new(list).map_or(1, |nn| drop(Box::from_raw(nn.as_ptr())).into_default())
+    NonNull::new(list)
+        .also_run(|nn| drop(Box::from_raw(nn.as_ptr())))
+        .map_or(1, |_| 0)
 }
 
 /// Obtains next element in [`Iter`], returns `NULL` if there are no more elements
@@ -865,5 +870,7 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
 /// ```
 #[no_mangle]
 pub unsafe extern "C" fn vs_iter_destroy(iter: *mut vs_iter_t<'_>) -> u8 {
-    NonNull::new(iter).map_or(1, |nn| drop(Box::from_raw(nn.as_ptr())).into_default())
+    NonNull::new(iter)
+        .also_run(|nn| drop(Box::from_raw(nn.as_ptr())))
+        .map_or(1, |_| 0)
 }

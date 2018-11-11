@@ -4,7 +4,7 @@
 //! [`VS`]: ./type.VS.html
 
 use std::sync::Arc;
-use {node::Node, voluntary_servitude::Inner, Combinator};
+use {node::Node, voluntary_servitude::Inner, AlsoRun};
 
 /// Lock-free iterator based on [`VS`]
 ///
