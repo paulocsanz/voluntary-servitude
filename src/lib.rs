@@ -5,7 +5,7 @@
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
-//!  - [`Call this code from C (FFI)`] (also in **./examples**)
+//!  - [`Use VoluntaryServitude from C (FFI) ("ffi" feature)`] (also in **./examples**)
 //!  - [`Logging ("logs" feature)`]
 //!
 //! # Atomic abstractions
@@ -35,16 +35,15 @@
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
-//! [`Call this code from C (FFI)`]: ./ffi/index.html
+//! [`Use VoluntaryServitude from C (FFI)`]: ./ffi/index.html
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
 //! [`Logging ("logs" feature)`]: #functions
 
-#![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 #![deny(
-    missing_debug_implementations,
     missing_docs,
+    missing_debug_implementations,
     trivial_numeric_casts,
     unused_extern_crates,
     unused_import_braces,
@@ -62,8 +61,6 @@
     patterns_in_fns_without_body,
     plugin_as_library,
     private_in_public,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     safe_extern_statics,
     unconditional_recursion,
     unions_with_drop_fields,
@@ -72,7 +69,6 @@
     unused_parens,
     while_true
 )]
-#![doc(test(attr(deny(warnings))))]
 #![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.6/voluntary-servitude")]
 
 #[cfg(feature = "rayon-traits")]
@@ -81,7 +77,7 @@ extern crate rayon as rayon_lib;
 #[cfg(feature = "serde-traits")]
 extern crate serde as serde_lib;
 
-extern crate crossbeam;
+extern crate parking_lot;
 
 #[macro_use]
 #[cfg(feature = "logs")]
@@ -141,6 +137,8 @@ mod mock {
 mod macros;
 mod atomic;
 mod atomic_option;
+#[cfg(feature = "ffi")]
+#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "ffi")))]
 pub mod ffi;
 mod fill_once_atomic_arc;
 mod fill_once_atomic_option;

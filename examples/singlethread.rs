@@ -19,7 +19,7 @@ fn main() {
 
     // You can get the current iteration index
     // iter.next() == iter.len() means iteration ended (iter.next() == None)
-    let mut iter = list.iter();
+    let mut iter = &mut list.iter();
     assert_eq!(iter.index(), 0);
     assert_eq!(iter.next(), Some(&0));
     assert_eq!(iter.index(), 1);
@@ -30,5 +30,5 @@ fn main() {
     assert_eq!(iter.len(), 3);
     assert_eq!(list.len(), 0);
     assert_eq!(list.iter().len(), 0);
-    assert_eq!(list.iter().next(), None);
+    assert_eq!((&mut list.iter()).next(), None);
 }

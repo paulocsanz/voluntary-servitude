@@ -1,13 +1,19 @@
 //! Atomic `Box<T>`
 
-use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
+use std::fmt::{self, Debug, Formatter, Pointer};
 use std::ptr::{null_mut, NonNull};
 use std::{marker::PhantomData, mem::drop, sync::atomic::AtomicPtr, sync::atomic::Ordering};
 use IntoPtr;
 
 /// Atomic abstractions of a `Box<T>`
-#[derive(Debug)]
 pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
+
+impl<T: Debug> Debug for Atomic<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("Atomic").field(&self.0).finish()
+    }
+}
 
 impl<T> Atomic<T> {
     /// Inner swap, helper to swap `Atomic` values
@@ -188,7 +194,7 @@ impl<T> From<Box<T>> for Atomic<T> {
 
 impl<T> Pointer for Atomic<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
     }
 }
@@ -197,8 +203,8 @@ impl<T> Drop for Atomic<T> {
     #[inline]
     fn drop(&mut self) {
         info!("Drop");
-        let _ = NonNull::new(self.0.swap(null_mut(), Ordering::SeqCst))
-            .map(|nn| drop(unsafe { Box::from_raw(nn.as_ptr()) }));
+        NonNull::new(self.0.swap(null_mut(), Ordering::SeqCst))
+            .map_or((), |nn| drop(unsafe { Box::from_raw(nn.as_ptr()) }));
     }
 }
 

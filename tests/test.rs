@@ -196,13 +196,13 @@ fn elements_n(num: usize) {
         list.append(i);
     }
     assert_eq!(list.iter().count(), num);
-    assert_eq!(list.iter().next(), Some(&0));
+    assert_eq!((&mut list.iter()).next(), Some(&0));
     for (i, el) in list.iter().enumerate() {
         assert_eq!(*el, i);
     }
 
-    let mut iter = list.iter();
-    let iter_count = list.iter();
+    let mut iter = &mut list.iter();
+    let iter_count = &mut list.iter();
     list.clear();
     assert_eq!(iter_count.count(), num);
     assert_eq!(iter.next(), Some(&0));

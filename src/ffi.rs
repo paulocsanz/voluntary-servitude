@@ -22,21 +22,22 @@
 //!
 //! ```c
 //! #include<assert.h>
+//! #include<stdlib.h>
 //! #include<stdio.h>
 //! #include "../include/voluntary_servitude.h"
 //!
 //! int main(int argc, char **argv) {
 //!     // You are responsible for making sure 'vs' exists while accessed
-//!     vs_t * vs = vs_new();
+//!     vs_t * vs = vs_new(NULL);
 //!
 //!     // Current vs_t length
 //!     // Be careful with race-conditions since the value, when used, may not be true anymore
 //!     assert(vs_len(vs) == 0);
 //!
-//!     const unsigned int data[2] = {12, 25};
+//!     static uint8_t DATA[2] = {12, 25};
 //!     // Inserts void pointer to data to end of vs_t
-//!     vs_append(vs, (void *) &data[0]);
-//!     vs_append(vs, (void *) &data[1]);
+//!     vs_append(vs, &DATA[0]);
+//!     vs_append(vs, &DATA[1]);
 //!
 //!     // Creates a one-time lock-free iterator based on vs_t
 //!     vs_iter_t * iter = vs_iter(vs);
@@ -95,14 +96,14 @@
 //! const unsigned int num_threads = 12;
 //!
 //! const unsigned int num_producer_values = 10000000;
-//! const unsigned int data = 3;
+//! static uint8_t DATA = 3;
 //!
 //! void * producer(void *);
 //! void * consumer(void *);
 //!
 //! int main(int argc, char** argv) {
 //!     // You are responsible for making sure 'vs' exists while accessed
-//!     vs_t * vs = vs_new();
+//!     vs_t * vs = vs_new(NULL);
 //!     uint8_t thread = 0;
 //!     pthread_attr_t attr;
 //!     pthread_t threads[num_threads];
@@ -114,7 +115,7 @@
 //!
 //!     // Creates producer threads
 //!     for (thread = 0; thread < num_producers; ++thread) {
-//!         if (pthread_create(&threads[thread], &attr, &producer, (void *) vs) != 0) {
+//!         if (pthread_create(&threads[thread], &attr, &producer, vs) != 0) {
 //!             fprintf(stderr, "Failed to create producer thread %d.\n", thread);
 //!             exit(-2);
 //!         }
@@ -123,7 +124,7 @@
 //!
 //!     // Creates consumers threads
 //!     for (thread = 0; thread < num_consumers; ++thread) {
-//!         if (pthread_create(&threads[num_producers + thread], &attr, &consumer, (void *) vs) != 0) {
+//!         if (pthread_create(&threads[num_producers + thread], &attr, &consumer, vs) != 0) {
 //!             fprintf(stderr, "Failed to create consumer thread %d.\n", thread);
 //!             exit(-3);
 //!         }
@@ -146,7 +147,7 @@
 //! void * producer(void * vs){
 //!     unsigned int index;
 //!     for (index = 0; index < num_producer_values; ++index) {
-//!         assert(vs_append(vs, (void *) &data) == 0);
+//!         assert(vs_append(vs, &DATA) == 0);
 //!     }
 //!     return NULL;
 //! }
@@ -172,20 +173,50 @@
 //! }
 //! ```
 
-use std::{mem::drop, os::raw::c_void, ptr::null, ptr::NonNull};
-use {IntoPtr, Iter, VS, AlsoRun};
+use std::fmt::{self, Debug, Formatter};
+use std::{num::NonZeroUsize, os::raw::c_void, ptr::null_mut, ptr::NonNull, sync::Arc};
+use {voluntary_servitude::Inner, AlsoRun, IntoPtr, Iter, VS};
+
+/// Function used to free the memory inside `vs_t` and `vs_iter_t`
+pub type FnFree = Option<unsafe extern "C" fn(*mut c_void)>;
+
+/// Wraps public types (`vs_t` and `vs_iter_t`) to properly free its data
+#[repr(C)]
+pub struct FreeWrapper<T>(T, FnFree);
+
+impl<T: Debug> Debug for FreeWrapper<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("FreeWrapper")
+            .field(&self.0)
+            .field(&self.1)
+            .finish()
+    }
+}
+
+/// Properly destroy data inside datastructures
+#[inline]
+unsafe fn destroy(inner: Inner<*mut c_void>, free: FnFree) {
+    info!("Destroy Inner with {:?}", free);
+    if let Some(free) = free {
+        for ptr in &mut Iter::new(Arc::new(inner)) {
+            trace!("Destroy element in {:p}", *ptr);
+            free(*ptr);
+        }
+    }
+}
 
 /// [`VoluntaryServitude`]'s representation in C
 ///
 /// [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 #[allow(non_camel_case_types)]
-pub type vs_t = VS<*const c_void>;
+pub type vs_t = FreeWrapper<VS<*mut c_void>>;
 
 /// [`Iter`]'s representation in C
 ///
 /// [`Iter`]: ./struct.Iter.html
 #[allow(non_camel_case_types)]
-pub type vs_iter_t<'a> = Iter<'a, *const c_void>;
+pub type vs_iter_t = FreeWrapper<Iter<*mut c_void>>;
 
 /// Initializes logger according to `RUST_LOG` env var (exists behind the `logs` feature)
 ///
@@ -213,7 +244,10 @@ pub unsafe extern "C" fn initialize_logger() {
     ::setup_logger();
 }
 
-/// Creates new empty [`VoluntaryServitude`]
+/// Creates new empty [`VoluntaryServitude`], you must specify how the data should be freed
+///
+/// If it's static you should provide `NULL`, if it's dynamically allocated profide the pointer to
+/// the necessary function
 ///
 /// [`vs_destroy`] should be called eventually for the [`VoluntaryServitude`] returned, otherwise memory will leak
 ///
@@ -226,7 +260,7 @@ pub unsafe extern "C" fn initialize_logger() {
 /// use voluntary_servitude::ffi::*;
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
+///     let vs = vs_new(None);
 ///     assert_eq!(vs_len(vs), 0);
 ///     assert_eq!(vs_destroy(vs), 0);
 /// }
@@ -239,15 +273,15 @@ pub unsafe extern "C" fn initialize_logger() {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
+///     vs_t * vs = vs_new(NULL);
 ///     assert(vs_len(vs) == 0);
 ///     assert(vs_destroy(vs) == 0);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_new() -> *mut vs_t {
-    vs![].into_ptr()
+pub unsafe extern "C" fn vs_new(free: FnFree) -> *mut vs_t {
+    FreeWrapper(vs![], free).into_ptr()
 }
 
 /// Makes lock-free iterator ([`Iter`]) based on [`VoluntaryServitude`]
@@ -268,21 +302,25 @@ pub unsafe extern "C" fn vs_new() -> *mut vs_t {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
 ///
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     let iter = vs_iter(vs);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert_eq!(vs_destroy(vs), 0);
 ///
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
 ///     assert!(vs_iter_next(iter).is_null());
 ///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
@@ -298,12 +336,12 @@ pub unsafe extern "C" fn vs_new() -> *mut vs_t {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
-///     const unsigned int data = 5;
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA = 5;
 ///
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     vs_iter_t * iter = vs_iter(vs);
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_destroy(vs) == 0);
 ///
 ///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
@@ -318,8 +356,11 @@ pub unsafe extern "C" fn vs_new() -> *mut vs_t {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter<'a>(vs: *mut vs_t) -> *mut vs_iter_t<'a> {
-    NonNull::new(vs).map(|nn| (&*nn.as_ptr()).iter()).into_ptr()
+pub unsafe extern "C" fn vs_iter(vs: *mut vs_t) -> *mut vs_iter_t {
+    NonNull::new(vs)
+        .map(|nn| &*nn.as_ptr())
+        .map(|FreeWrapper(vs, free)| FreeWrapper(vs.iter(), *free))
+        .into_ptr()
 }
 
 /// Atomically extracts current size of [`VoluntaryServitude`], be careful with race conditions when using it
@@ -333,15 +374,19 @@ pub unsafe extern "C" fn vs_iter<'a>(vs: *mut vs_t) -> *mut vs_iter_t<'a> {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
+///     let vs = vs_new(Some(free));
 ///     assert_eq!(vs_len(vs), 0);
-///     let data: i32 = 5;
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert_eq!(vs_len(vs), 1);
 ///     assert_eq!(vs_clear(vs), 0);
 ///     assert_eq!(vs_len(vs), 0);
@@ -359,11 +404,11 @@ pub unsafe extern "C" fn vs_iter<'a>(vs: *mut vs_t) -> *mut vs_iter_t<'a> {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
+///     vs_t * vs = vs_new(NULL);
 ///     assert(vs_len(vs) == 0);
 ///
-///     const unsigned int data = 5;
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_len(vs) == 1);
 ///     assert(vs_clear(vs) == 0);
 ///     assert(vs_len(vs) == 0);
@@ -375,8 +420,8 @@ pub unsafe extern "C" fn vs_iter<'a>(vs: *mut vs_t) -> *mut vs_iter_t<'a> {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_len(vs: *const vs_t) -> usize {
-    NonNull::new(vs as *mut vs_t).map_or(0, |nn| nn.as_ref().len())
+pub unsafe extern "C" fn vs_len(vs: *mut vs_t) -> u64 {
+    NonNull::new(vs as *mut vs_t).map_or(0, |nn| nn.as_ref().0.len() as u64)
 }
 
 /// Append element to [`VoluntaryServitude`]
@@ -392,20 +437,25 @@ pub unsafe extern "C" fn vs_len(vs: *const vs_t) -> usize {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert_eq!(vs_len(vs), 2);
 ///     assert_eq!(vs_destroy(vs), 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert_eq!(vs_append(null_mut(), &data as *const i32 as *const c_void), 1);
+///     assert_eq!(vs_append(null_mut(), data), 1);
+///     assert_eq!(vs_append(vs, null_mut()), 1);
 /// }
 /// ```
 ///
@@ -416,23 +466,23 @@ pub unsafe extern "C" fn vs_len(vs: *const vs_t) -> usize {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
-///     const unsigned int data = 5;
-///     assert(vs_append(vs, (void *) &data) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_len(vs) == 2);
 ///     assert(vs_destroy(vs) == 0);
 ///
 ///     // Returns 1 on NULL pointer
-///     assert(vs_append(NULL, (void *) &data) == 1);
+///     assert(vs_append(NULL, &DATA) == 1);
+///     assert(vs_append(vs, NULL) == 1);
 ///     return 0;
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 {
-    NonNull::new(vs)
-        .and_then(|vs| NonNull::new(element as *mut c_void).map(|el| (vs, el)))
-        .also_run(|(vs, el)| vs.as_ref().append(el.as_ptr()))
+pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *mut c_void) -> u8 {
+    NonZeroUsize::new(vs as usize & element as usize)
+        .also_run(|_| (*vs).0.append(element))
         .map_or(1, |_| 0)
 }
 
@@ -450,14 +500,18 @@ pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert_eq!(vs_len(vs), 1);
 ///     assert_eq!(vs_clear(vs), 0);
 ///     assert_eq!(vs_len(vs), 0);
@@ -474,9 +528,9 @@ pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
-///     const unsigned int data = 5;
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_len(vs) == 1);
 ///     assert(vs_clear(vs) == 0);
 ///     assert(vs_len(vs) == 0);
@@ -489,8 +543,70 @@ pub unsafe extern "C" fn vs_append(vs: *mut vs_t, element: *const c_void) -> u8 
 #[no_mangle]
 pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
     NonNull::new(vs)
-        .also_run(|nn| nn.as_ref().clear())
+        .also_run(|nn| nn.as_ref().0.clear())
         .map_or(1, |_| 0)
+}
+
+/// Removes all elements from [`VoluntaryServitude`] returning iterator ([`Iter`]) to it
+///
+/// Returns `NULL` if pointer to [`VoluntaryServitude`] is `NULL`
+///
+/// Warning: UB if pointer to [`VoluntaryServitude`] is invalid
+///
+/// [`VoluntaryServitude`]: ../struct.VoluntaryServitude.html
+/// [`Iter`]: ../struct.Iter.html
+///
+/// # Rust
+///
+/// ```rust
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
+/// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
+///
+/// unsafe {
+///     # #[cfg(feature = "logs")] initialize_logger();
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_len(vs), 1);
+///     let iter = vs_empty(vs);
+///     assert_eq!(vs_iter_len(iter), 1);
+///     assert_eq!(vs_len(vs), 0);
+///
+///     // Returns 1 on NULL pointer
+///     assert_eq!(vs_iter(null_mut()), null_mut());
+/// }
+/// ```
+///
+/// # C
+///
+/// ```c
+/// #include<assert.h>
+/// #include "../include/voluntary_servitude.h"
+///
+/// int main(int argc, char **argv) {
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_len(vs) == 1);
+///     vs_iter_t * iter = vs_empty(vs);
+///     assert(vs_iter_len(vs) == 1);
+///     assert(vs_len(vs) == 0);
+///
+///     // Returns 1 on NULL pointer
+///     assert(vs_empty(NULL) == NULL);
+///     return 0;
+/// }
+/// ```
+#[no_mangle]
+pub unsafe extern "C" fn vs_empty(vs: *mut vs_t) -> *mut vs_iter_t {
+    NonNull::new(vs)
+        .map(|nn| &*nn.as_ptr())
+        .map(|FreeWrapper(vs, free)| FreeWrapper(vs.empty(), *free))
+        .into_ptr()
 }
 
 /// Free [`VoluntaryServitude`] (preserves existing [`Iter`])
@@ -507,18 +623,22 @@ pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
+///     assert_eq!(vs_append(vs, data), 0);
 ///     let iter = vs_iter(vs);
 ///     assert_eq!(vs_destroy(vs), 0);
 ///
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
 ///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
 ///     // Returns 1 on NULL pointer
@@ -533,10 +653,10 @@ pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
+///     vs_t * vs = vs_new(NULL);
 ///     vs_iter_t * iter = vs_iter(vs);
-///     const unsigned int data = 5;
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_destroy(vs) == 0);
 ///
 ///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
@@ -550,7 +670,8 @@ pub unsafe extern "C" fn vs_clear(vs: *mut vs_t) -> u8 {
 #[no_mangle]
 pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
     NonNull::new(list)
-        .also_run(|nn| drop(Box::from_raw(nn.as_ptr())))
+        .map(|nn| &mut *nn.as_ptr())
+        .map(|FreeWrapper(vs, free)| vs.try_unwrap().map(|inner| destroy(inner, *free)))
         .map_or(1, |_| 0)
 }
 
@@ -565,32 +686,36 @@ pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
 ///
 ///     let iter = vs_iter(vs);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert!(vs_iter_next(iter).is_null());
 ///     assert_eq!(vs_iter_destroy(iter), 0);
 ///
 ///     let iter = vs_iter(vs);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
 ///
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 5);
 ///     assert!(vs_iter_next(iter).is_null());
 ///
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert!(vs_iter_next(iter).is_null());
 ///
 ///     assert_eq!(vs_iter_destroy(iter), 0);
@@ -608,12 +733,12 @@ pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
+///     vs_t * vs = vs_new(NULL);
 ///     vs_iter_t * iter = vs_iter(vs);
-///     const unsigned int data = 5;
-///     assert(vs_append(vs, (void *) &data) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     static uint8_t DATA = 5;
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_iter_next(iter) == NULL);
 ///     assert(vs_iter_destroy(iter) == 0);
 ///
@@ -622,11 +747,11 @@ pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
 ///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
 ///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
 ///
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(*(unsigned int *) vs_iter_next(iter) == 5);
 ///     assert(vs_iter_next(iter) == NULL);
 ///
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_iter_next(iter) == NULL);
 ///
 ///     assert(vs_iter_destroy(iter) == 0);
@@ -638,10 +763,10 @@ pub unsafe extern "C" fn vs_destroy(list: *mut vs_t) -> u8 {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void {
+pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t) -> *const c_void {
     NonNull::new(iter)
-        .and_then(|mut nn| nn.as_mut().next().cloned())
-        .unwrap_or(null())
+        .and_then(|mut nn| (&mut nn.as_mut().0).next().cloned())
+        .unwrap_or(null_mut())
 }
 
 /// Returns total size of [`Iter`], it may grow, but never decrease
@@ -657,15 +782,19 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: i32 = 5;
+///     let vs = vs_new(Some(free));
+///     let data = Box::into_raw(Box::new(5)) as *mut c_void;
 ///     let iter = vs_iter(vs);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///
 ///     assert_eq!(vs_len(vs), 1);
 ///     assert_eq!(vs_iter_len(iter), 0);
@@ -674,9 +803,9 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void
 ///     let iter = vs_iter(vs);
 ///     assert_eq!(vs_iter_len(iter), 1);
 ///
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data as *const i32 as *const c_void), 0);
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_append(vs, data), 0);
+///     assert_eq!(vs_append(vs, data), 0);
 ///     assert_eq!(vs_len(vs), 4);
 ///     assert_eq!(vs_iter_len(iter), 4);
 ///
@@ -703,12 +832,12 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
-///     const unsigned int data = 5;
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA = 5;
 ///
 ///     vs_iter_t * iter = vs_iter(vs);
 ///     assert(vs_iter_len(iter) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///
 ///     assert(vs_len(vs) == 1);
 ///     assert(vs_iter_len(iter) == 0);
@@ -717,9 +846,9 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void
 ///     vs_iter_t * iter2 = vs_iter(vs);
 ///     assert(vs_len(vs) == 1);
 ///
-///     assert(vs_append(vs, (void *) &data) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
-///     assert(vs_append(vs, (void *) &data) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
+///     assert(vs_append(vs, &DATA) == 0);
 ///     assert(vs_len(vs) == 4);
 ///     assert(vs_iter_len(iter2) == 4);
 ///
@@ -740,8 +869,8 @@ pub unsafe extern "C" fn vs_iter_next(iter: *mut vs_iter_t<'_>) -> *const c_void
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t<'_>) -> usize {
-    NonNull::new(iter as *mut vs_iter_t<'_>).map_or(0, |nn| nn.as_ref().len())
+pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t) -> u64 {
+    NonNull::new(iter as *mut vs_iter_t).map_or(0, |nn| nn.as_ref().0.len()) as u64
 }
 
 /// Returns current [`Iter`] index
@@ -755,22 +884,28 @@ pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t<'_>) -> usize {
 /// # Rust
 ///
 /// ```rust
-/// use std::{ptr::null_mut, os::raw::c_void};
+/// use std::{ptr::null_mut, os::raw::c_void, ptr::drop_in_place};
 /// use voluntary_servitude::ffi::*;
+///
+/// unsafe extern "C" fn free(ptr: *mut c_void) {
+///     drop_in_place(ptr);
+/// }
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
-///     let data: [i32; 3] = [4, 9, 8];
-///     assert_eq!(vs_append(vs, &data[0] as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data[1] as *const i32 as *const c_void), 0);
-///     assert_eq!(vs_append(vs, &data[2] as *const i32 as *const c_void), 0);
+///     let vs = vs_new(Some(free));
+///     let into_ptr = |v| Box::into_raw(Box::new(v)) as *mut c_void;
+///     let data = (into_ptr(4), into_ptr(9), into_ptr(8));
+///     let iter = vs_iter(vs);
+///     assert_eq!(vs_append(vs, data.0), 0);
+///     assert_eq!(vs_append(vs, data.1), 0);
+///     assert_eq!(vs_append(vs, data.2), 0);
 ///
 ///     let iter = vs_iter(vs);
 ///     assert_eq!(vs_iter_index(iter), 0);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 4);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 9);
-///     assert_eq!(*(vs_iter_next(iter) as *const i32), 8);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 4);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 9);
+///     assert_eq!(*(vs_iter_next(iter) as *mut i32), 8);
 ///     assert_eq!(vs_iter_index(iter), 3);
 ///
 ///     assert!(vs_iter_next(iter).is_null());
@@ -792,11 +927,11 @@ pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t<'_>) -> usize {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
-///     const unsigned int data[3] = { 4, 9, 8 };
-///     assert(vs_append(vs, (void *) data) == 0);
-///     assert(vs_append(vs, (void *) (data + 1)) == 0);
-///     assert(vs_append(vs, (void *) (data + 2)) == 0);
+///     vs_t * vs = vs_new(NULL);
+///     static uint8_t DATA[3] = { 4, 9, 8 };
+///     assert(vs_append(vs, &DATA[0]) == 0);
+///     assert(vs_append(vs, &DATA[1]) == 0);
+///     assert(vs_append(vs, &DATA[2]) == 0);
 ///
 ///     vs_iter_t * iter = vs_iter(vs);
 ///     assert(vs_iter_index(iter) == 0);
@@ -818,8 +953,8 @@ pub unsafe extern "C" fn vs_iter_len(iter: *const vs_iter_t<'_>) -> usize {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
-    NonNull::new(iter as *mut vs_iter_t<'_>).map_or(0, |nn| nn.as_ref().index())
+pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t) -> u64 {
+    NonNull::new(iter as *mut vs_iter_t).map_or(0, |nn| nn.as_ref().0.index()) as u64
 }
 
 /// Free [`Iter`] (can happen after [`VoluntaryServitude`]'s free)
@@ -841,7 +976,7 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
 ///
 /// unsafe {
 ///     # #[cfg(feature = "logs")] initialize_logger();
-///     let vs = vs_new();
+///     let vs = vs_new(None);
 ///     let iter = vs_iter(vs);
 ///     assert_eq!(vs_destroy(vs), 0);
 ///     assert_eq!(vs_iter_destroy(iter), 0);
@@ -858,7 +993,7 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
 /// #include "../include/voluntary_servitude.h"
 ///
 /// int main(int argc, char **argv) {
-///     vs_t * vs = vs_new();
+///     vs_t * vs = vs_new(NULL);
 ///     vs_iter_t * iter = vs_iter(vs);
 ///     assert(vs_destroy(vs) == 0);
 ///     assert(vs_iter_destry(iter) == 0);
@@ -869,8 +1004,9 @@ pub unsafe extern "C" fn vs_iter_index(iter: *const vs_iter_t<'_>) -> usize {
 /// }
 /// ```
 #[no_mangle]
-pub unsafe extern "C" fn vs_iter_destroy(iter: *mut vs_iter_t<'_>) -> u8 {
+pub unsafe extern "C" fn vs_iter_destroy(iter: *mut vs_iter_t) -> u8 {
     NonNull::new(iter)
-        .also_run(|nn| drop(Box::from_raw(nn.as_ptr())))
+        .map(|nn| &mut *nn.as_ptr())
+        .map(|FreeWrapper(vs, free)| vs.try_unwrap().map(|inner| destroy(inner, *free)))
         .map_or(1, |_| 0)
 }

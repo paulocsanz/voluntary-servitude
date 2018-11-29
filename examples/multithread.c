@@ -4,19 +4,19 @@
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
-const unsigned int num_consumers = 8;
-const unsigned int num_producers = 4;
-const unsigned int num_threads = 12;
+const uint8_t num_consumers = 8;
+const uint8_t num_producers = 4;
+const uint8_t num_threads = 12;
 
 const unsigned int num_producer_values = 10000000;
-const unsigned int data = 3;
+static uint8_t data = 3;
 
 void * producer(void *);
 void * consumer(void *);
 
 int main(int argc, char** argv) {
     // You are responsible for making sure 'vs' exists while accessed
-    vs_t * vs = vs_new();
+    vs_t * vs = vs_new(&free);
     uint8_t thread = 0;
     pthread_attr_t attr;
     pthread_t threads[num_threads];
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
 
     // Creates producer threads
     for (thread = 0; thread < num_producers; ++thread) {
-        if (pthread_create(&threads[thread], &attr, &producer, (void *) vs) != 0) {
+        if (pthread_create(&threads[thread], &attr, &producer, vs) != 0) {
             fprintf(stderr, "Failed to create producer thread %d.\n", thread);
             exit(-2);
         }
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
 
     // Creates consumers threads
     for (thread = 0; thread < num_consumers; ++thread) {
-        if (pthread_create(&threads[num_producers + thread], &attr, &consumer, (void *) vs) != 0) {
+        if (pthread_create(&threads[num_producers + thread], &attr, &consumer, vs) != 0) {
             fprintf(stderr, "Failed to create consumer thread %d.\n", thread);
             exit(-3);
         }
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 void * producer(void * vs){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        assert(vs_append(vs, (void *) &data) == 0);
+        assert(vs_append(vs, &data) == 0);
     }
     return NULL;
 }
@@ -71,7 +71,7 @@ void * consumer(void * vs) {
 
     while (values < total_values) {
         vs_iter_t * iter = vs_iter(vs);
-        void * value;
+        const void * value;
 
         values = 0;
         while ((value = vs_iter_next(iter)) != NULL) {

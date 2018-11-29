@@ -9,10 +9,18 @@ use {Atomic, FillOnceAtomicOption, IntoPtr};
 ///
 /// [`AtomicOption`]: ./struct.AtomicOption.html#method.try_store
 /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html#method.try_store
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct NotEmpty;
 
+impl Debug for NotEmpty {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "NotEmpty")
+    }
+}
+
 impl Display for NotEmpty {
+    #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "not empty")
     }
@@ -21,8 +29,14 @@ impl Display for NotEmpty {
 impl Error for NotEmpty {}
 
 /// Atomic abstraction of a `Option<Box<T>>`
-#[derive(Debug)]
 pub struct AtomicOption<T>(AtomicPtr<T>, PhantomData<Option<Box<T>>>);
+
+impl<T: Debug> Debug for AtomicOption<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("AtomicOption").field(&self.0).finish()
+    }
+}
 
 impl<T> AtomicOption<T> {
     /// Creates new `AtomicOption`

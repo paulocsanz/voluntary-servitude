@@ -2,7 +2,7 @@
 //!
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::Ordering;
 use FillOnceAtomicOption;
 
@@ -51,19 +51,19 @@ impl<T> Node<T> {
 
 /// Default Drop is recursive and causes a stackoverflow easily
 impl<T> Drop for Node<T> {
+    #[inline]
     fn drop(&mut self) {
-        info!("Drop chained nodes");
+        debug!("Drop nodes");
         let mut node = unsafe { self.next.dangle() };
         while let Some(mut n) = node {
             node = unsafe { n.next.dangle() };
         }
-        debug!("Dropped all chained nodes");
     }
 }
 
 impl<T: Debug> Debug for Node<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Node")
             .field("value", &self.value)
             .field("next", &self.next.get_ref(Ordering::SeqCst))

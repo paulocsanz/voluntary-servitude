@@ -7,7 +7,7 @@
  - Thread-safe appendable list with a lock-free iterator (`VoluntaryServitude` - also called `VS`)
  - Serde serialization (`serde-traits` feature)
  - `par_extend`, `from_par_iter` rayon implementation
- - Call this code from C (FFI) (also in **./examples**)
+ - Use `VoluntaryServitude` from C (FFI) ("ffi feature")
  - Logging (`logs` feature)
 
 # Atomic abstractions
@@ -133,8 +133,8 @@ int main(int argc, char **argv) {
 
     const unsigned int data[2] = {12, 25};
     // Inserts void pointer to data to end of vs_t
-    vs_append(vs, (void *) &data[0]);
-    vs_append(vs, (void *) &data[1]);
+    vs_append(vs, &data[0]);
+    vs_append(vs, &data[1]);
 
     // Creates a one-time lock-free iterator based on vs_t
     vs_iter_t * iter = vs_iter(vs);
@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
 
     // Creates producer threads
     for (thread = 0; thread < num_producers; ++thread) {
-        if (pthread_create(&threads[thread], &attr, &producer, (void *) vs) != 0) {
+        if (pthread_create(&threads[thread], &attr, &producer, vs) != 0) {
             fprintf(stderr, "Failed to create producer thread %d.\n", thread);
             exit(-2);
         }
@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
 
     // Creates consumers threads
     for (thread = 0; thread < num_consumers; ++thread) {
-        if (pthread_create(&threads[num_producers + thread], &attr, &consumer, (void *) vs) != 0) {
+        if (pthread_create(&threads[num_producers + thread], &attr, &consumer, vs) != 0) {
             fprintf(stderr, "Failed to create consumer thread %d.\n", thread);
             exit(-3);
         }
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
 void * producer(void * vs){
     unsigned int index;
     for (index = 0; index < num_producer_values; ++index) {
-        assert(vs_append(vs, (void *) &data) == 0);
+        assert(vs_append(vs, &data) == 0);
     }
     return NULL;
 }

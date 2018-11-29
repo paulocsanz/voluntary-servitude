@@ -3,32 +3,61 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 
-use std::sync::Arc;
+use std::fmt::{self, Debug, Formatter};
+use std::{iter::FusedIterator, mem::replace, ptr::NonNull, sync::Arc};
 use {node::Node, voluntary_servitude::Inner, AlsoRun};
 
 /// Lock-free iterator based on [`VS`]
 ///
 /// [`VS`]: ./type.VS.html
-#[derive(Debug, Clone)]
-pub struct Iter<'a, T: 'a> {
+#[derive(Clone)]
+pub struct Iter<T> {
     /// References `Inner` extracted from `VS`
     inner: Arc<Inner<T>>,
     /// Current node in iteration
-    current: Option<&'a Node<T>>,
+    current: Option<NonNull<Node<T>>>,
     /// Iteration index
     index: usize,
 }
 
-impl<'a, T: 'a> Iter<'a, T> {
+impl<T: Debug> Debug for Iter<T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("Iter")
+            .field("inner", &self.inner)
+            .field(
+                "current",
+                &self.current.map(|ptr| unsafe { &*ptr.as_ptr() }),
+            ).field("index", &self.index)
+            .finish()
+    }
+}
+
+impl<T> Iter<T> {
+    /// Empties list, returning its Inner if it's the last one
+    ///
+    /// It's used to manually drop each element (like in FFI)
+    #[inline]
+    pub fn try_unwrap(&mut self) -> Option<Inner<T>> {
+        trace!("try_unwrap");
+        self.current = None;
+        Arc::try_unwrap(replace(&mut self.inner, Arc::new(Inner::default()))).ok()
+    }
+
     /// Creates a new lock-free iterator
     #[inline]
     pub(crate) fn new(inner: Arc<Inner<T>>) -> Self {
         trace!("new()");
         Self {
-            current: inner.first_node().map(|nn| unsafe { &*nn.as_ptr() }),
+            current: inner.first_node(),
             inner,
             index: 0,
         }
+    }
+
+    /// Returns mutable reference, allowing iteration
+    pub fn iter(&mut self) -> &mut Self {
+        self
     }
 
     /// Obtains current iterator index
@@ -37,7 +66,7 @@ impl<'a, T: 'a> Iter<'a, T> {
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let vs = vs![3];
-    /// let mut iter = vs.iter();
+    /// let mut iter = &mut vs.iter();
     /// assert_eq!(iter.next(), Some(&3));
     /// assert_eq!(iter.index(), 1);
     /// assert!(iter.next().is_none());
@@ -65,7 +94,7 @@ impl<'a, T: 'a> Iter<'a, T> {
     /// vs.clear();
     /// assert_eq!(iter.len(), 2);
     ///
-    /// let mut iter2 = vs.iter();
+    /// let mut iter2 = &mut vs.iter();
     /// assert_eq!(iter2.next(), None);
     /// assert_eq!(iter2.len(), 0);
     ///
@@ -104,17 +133,26 @@ impl<'a, T: 'a> Iter<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
+impl<'a, T> Iterator for &'a mut Iter<T> {
     type Item = &'a T;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         trace!("next()");
 
-        let data = self.current.also_run(|_| self.index += 1).map(Node::value);
+        let data = self
+            .current
+            .also_run(|_| self.index += 1)
+            .map(|ptr| unsafe { (*ptr.as_ptr()).value() });
+        //assert!(self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0);
+        //assert!((self.index <= self.inner.len() && data.is_some()) || self.index >= self.inner.len());
+        //assert!((self.index > self.inner.len() && data.is_none()) || self.index <= self.inner.len(), "{} {}", self.index, self.len());
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
 
-        self.current = self.current.take().and_then(|n| n.next());
+        self.current = self
+            .current
+            .and_then(|n| unsafe { (*n.as_ptr()).next() })
+            .and_then(|n| NonNull::new(n as *const Node<T> as *mut Node<T>));
         data
     }
 
@@ -124,6 +162,8 @@ impl<'a, T: 'a> Iterator for Iter<'a, T> {
         (self.index, Some(self.len()))
     }
 }
+
+impl<'a, T> FusedIterator for &'a mut Iter<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -138,7 +178,7 @@ mod tests {
     fn iter_all() {
         setup_logger();
         let vs = vs![1, 2, 3];
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         assert_eq!(iter.index(), 0);
         assert_eq!(iter.len(), 3);
 
@@ -157,7 +197,7 @@ mod tests {
         vs.clear();
         assert_eq!(vs.len(), 0);
         assert_eq!(iter.len(), 4);
-        let iter = vs.iter();
+        let iter = &mut vs.iter();
         assert_eq!(iter.len(), 0);
     }
 
@@ -165,14 +205,14 @@ mod tests {
     fn iter_isnt_growable_when_consumed() {
         setup_logger();
         let vs: VS<()> = voluntary_servitude![];
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         vs.append(());
         assert!(iter.is_empty());
         assert!(iter.next().is_none());
 
         let vs: VS<()> = voluntary_servitude![()];
         vs.append(());
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         assert_eq!(iter.next(), Some(&()));
         assert_eq!(iter.next(), Some(&()));
         vs.append(());
@@ -183,7 +223,7 @@ mod tests {
     fn iter_doesnt_clear() {
         setup_logger();
         let vs = voluntary_servitude![()];
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
 
         assert!(!vs.is_empty());
         vs.clear();
@@ -197,13 +237,13 @@ mod tests {
     fn iter_grows() {
         setup_logger();
         let vs = voluntary_servitude![1, 2, 3];
-        let iter = vs.iter();
-        let iter2 = vs.iter();
+        let iter = &mut vs.iter();
+        let iter2 = &mut vs.iter();
         assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3]);
 
         vs.append(4);
         assert_eq!(iter2.collect::<Vec<_>>(), vec![&1, &2, &3, &4]);
-        let iter = vs.iter();
+        let iter = &mut vs.iter();
         assert_eq!(iter.collect::<Vec<_>>(), vec![&1, &2, &3, &4]);
     }
 
@@ -211,11 +251,11 @@ mod tests {
     fn iter_many() {
         setup_logger();
         let vs = vs![1, 2, 3, 4, 5];
-        let mut iter = vs.iter();
-        let iter1 = vs.iter();
-        let iter2 = vs.iter();
+        let mut iter = &mut vs.iter();
+        let iter1 = &mut vs.iter();
+        let iter2 = &mut vs.iter();
         assert_eq!(iter2.collect::<Vec<&i32>>(), vec![&1, &2, &3, &4, &5]);
-        let iter3 = vs.iter();
+        let iter3 = &mut vs.iter();
         assert_eq!(iter1.collect::<Vec<&i32>>(), vec![&1, &2, &3, &4, &5]);
         assert_eq!(iter.next(), Some(&1));
         assert_eq!(iter3.collect::<Vec<&i32>>(), vec![&1, &2, &3, &4, &5]);
@@ -226,7 +266,7 @@ mod tests {
     fn iter_after_use() {
         setup_logger();
         let vs = vs![1];
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         assert_eq!(iter.next(), Some(&1));
         assert_eq!(iter.index(), iter.len());
 
@@ -242,11 +282,11 @@ mod tests {
         let vs = vs![1, 2, 3, 4, 5];
         drop(vs.iter());
 
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         assert_eq!(iter.next(), Some(&1));
         drop(iter);
 
-        let mut iter = vs.iter();
+        let mut iter = &mut vs.iter();
         while iter.next().is_some() {}
         drop(iter);
     }
@@ -255,12 +295,12 @@ mod tests {
     fn iter_drop_many() {
         setup_logger();
         let vs = vs![1, 2, 3, 4, 5];
-        let iter = vs.iter();
-        let mut iter1 = vs.iter();
-        let mut iter2 = vs.iter();
+        let iter = &mut vs.iter();
+        let mut iter1 = &mut vs.iter();
+        let mut iter2 = &mut vs.iter();
         assert_eq!(iter2.next(), Some(&1));
         assert_eq!(iter2.next(), Some(&2));
-        let mut iter3 = vs.iter();
+        let mut iter3 = &mut vs.iter();
         assert_eq!(iter2.next(), Some(&3));
         assert_eq!(iter2.next(), Some(&4));
         assert_eq!(iter2.next(), Some(&5));

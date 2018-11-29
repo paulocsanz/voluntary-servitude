@@ -1,19 +1,23 @@
 #include<assert.h>
+#include<stdlib.h>
 #include<stdio.h>
 #include "../include/voluntary_servitude.h"
 
 int main(int argc, char **argv) {
     // You are responsible for making sure 'vs' exists while accessed
-    vs_t * vs = vs_new();
+    vs_t * vs = vs_new(&free);
 
     // Current vs_t length
     // Be careful with race conditions since the value, when used, may not be true anymore
     assert(vs_len(vs) == 0);
 
-    const unsigned int data[2] = {12, 25};
+    uint8_t * const data = malloc(sizeof(*data));
+    data[0] = 12;
+    data[1] = 25;
+
     // Inserts void pointer to data to end of vs_t
-    vs_append(vs, (void *) &data[0]);
-    vs_append(vs, (void *) &data[1]);
+    vs_append(vs, &data[0]);
+    vs_append(vs, &data[1]);
 
     // Creates a one-time lock-free iterator based on vs_t
     vs_iter_t * iter = vs_iter(vs);
@@ -23,10 +27,10 @@ int main(int argc, char **argv) {
     assert(vs_len(vs) == 0);
     assert(vs_iter_len(iter) == 2);
 
-    assert(*(unsigned int *) vs_iter_next(iter) == 12);
+    assert(*(uint8_t *) vs_iter_next(iter) == 12);
     // Index changes as you iter through vs_iter_t
     assert(vs_iter_index(iter) == 1);
-    assert(*(unsigned int *) vs_iter_next(iter) == 25);
+    assert(*(uint8_t *) vs_iter_next(iter) == 25);
     assert(vs_iter_index(iter) == 2);
 
     assert(vs_iter_next(iter) == NULL);
@@ -41,7 +45,7 @@ int main(int argc, char **argv) {
     // Create updated vs_iter_t
     vs_iter_t * iter2 = vs_iter(vs);
 
-    // Never forget to free vs_t
+    // Never forget to free vs_t (NULL since it's static data, so we won't free it)
     assert(vs_destroy(vs) == 0);
 
     // vs_iter_t keeps existing after the original vs_t is freed (or cleared)

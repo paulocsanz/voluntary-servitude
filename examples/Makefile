@@ -4,9 +4,11 @@ FLAGS=-Wall -Wextra -Wpedantic -Werror -O3 -D_FORTIFY_SOURCE=2 -fvisibility=hidd
 default: all
 
 all:
-	RUSTFLAGS=-Cpanic=abort cargo build --release
+	RUSTFLAGS=-Cpanic=abort cargo +nightly build --release --features ffi
 	cp ../target/release/libvoluntary_servitude.so $(LIBDIR)
+	cp ../target/release/libvoluntary_servitude.a $(LIBDIR)
 	strip $(LIBDIR)/libvoluntary_servitude.so
+	strip $(LIBDIR)/libvoluntary_servitude.a
 	$(CC) $(FLAGS) ffi.c -L$(LIBDIR) -lvoluntary_servitude -o ffi
 	$(CC) $(FLAGS) multithread.c -L$(LIBDIR) -lpthread -lvoluntary_servitude -o multithread
 

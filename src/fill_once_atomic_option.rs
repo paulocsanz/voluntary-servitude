@@ -4,7 +4,7 @@
 //!
 //! This is ideal for a iterator or some consumer that doesn't actually consume the data
 
-use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
+use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ptr::NonNull, sync::atomic::Ordering};
 use {Atomic, AtomicOption, NotEmpty};
 
@@ -234,14 +234,14 @@ impl<T> From<Atomic<T>> for FillOnceAtomicOption<T> {
 
 impl<T> Pointer for FillOnceAtomicOption<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
     }
 }
 
 impl<T: Debug> Debug for FillOnceAtomicOption<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_tuple("FillOnceAtomicOption")
             .field(&self.get_ref(Ordering::SeqCst))
             .finish()

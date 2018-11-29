@@ -2,7 +2,7 @@
 //!
 //! Since `FillOnceAtomicArc` can only be filled once it's safe to provide access to the inner `Option<Arc<T>>`
 
-use std::fmt::{Debug, Formatter, Pointer, Result as FmtResult};
+use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ops::Deref, sync::atomic::Ordering, sync::Arc};
 use {FillOnceAtomicOption, NotEmpty};
 
@@ -180,14 +180,14 @@ impl<T> From<Option<Arc<T>>> for FillOnceAtomicArc<T> {
 
 impl<T> Pointer for FillOnceAtomicArc<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
     }
 }
 
 impl<T: Debug> Debug for FillOnceAtomicArc<T> {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_tuple("FillOnceAtomicArc")
             .field(&self.load(Ordering::SeqCst))
             .finish()
