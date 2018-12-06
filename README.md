@@ -20,7 +20,7 @@ With `Atomic` and `AtomicOption` it's not safe to get a reference, you must repl
 
 To safely get a reference to T you must use `FillOnceAtomicOption` and accept the API limitations
 
-A safe `AtomicArc` is impossible, so you must use `ArcCell` from crossbeam (locks to clone) or `FillOnceAtomicArc`
+A safe `AtomicArc` is impossible without a garbage collector, so you must use `ArcCell` from crossbeam (locks to clone) or `FillOnceAtomicArc`
 
 ## Licenses
 
