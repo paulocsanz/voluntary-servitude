@@ -3,7 +3,7 @@
 use parking_lot::RwLock;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{iter::Extend, iter::FromIterator, ptr::null_mut, ptr::NonNull, sync::Arc};
+use std::{iter::Extend, iter::FromIterator, ptr::null_mut, ptr::NonNull, sync::Arc, mem::swap};
 use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
@@ -351,10 +351,7 @@ impl<T> VoluntaryServitude<T> {
     #[inline]
     pub fn swap(&self, other: &Self) {
         debug!("empty()");
-        let (mut curr, mut other) = (self.0.write(), other.0.write());
-        let (old_self, old_other) = ((*curr).clone(), (*other).clone());
-        *curr = old_other;
-        *other = old_self;
+        swap(&mut *self.0.write(), &mut *other.0.write());
     }
 
     /// Extends `VS` like the `Extend` trait, but without needing a mutable reference
