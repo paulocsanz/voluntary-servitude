@@ -44,6 +44,12 @@ impl<T> Iter<T> {
         Arc::try_unwrap(replace(&mut self.inner, Arc::new(Inner::default()))).ok()
     }
 
+    /// Reference to last element in list
+    #[inline]
+    pub fn last_node(&self) -> Option<&T> {
+        self.inner.last_node().map(|nn| unsafe { (*nn.as_ptr()).value() })
+    }
+
     /// Creates a new lock-free iterator
     #[inline]
     pub(crate) fn new(inner: Arc<Inner<T>>) -> Self {

@@ -42,6 +42,14 @@ impl<T> Inner<T> {
         nn
     }
 
+    /// Atomically extracts pointer to last node
+    #[inline]
+    pub fn last_node(&self) -> Option<NonNull<Node<T>>> {
+        let nn = NonNull::new(self.last_node.load(Ordering::SeqCst));
+        trace!("last_node() = {:?}", nn);
+        nn
+    }
+
     /// Atomically extracts `Inner`'s size
     #[inline]
     pub fn len(&self) -> usize {
