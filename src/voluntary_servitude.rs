@@ -397,8 +397,8 @@ impl<T> Default for VoluntaryServitude<T> {
 impl<T: Debug> Debug for VoluntaryServitude<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.debug_struct("VoluntaryServitude")
-            .field("rwlock", &*self.0.read())
+        f.debug_tuple("VoluntaryServitude")
+            .field(&self.iter().collect::<Vec<_>>())
             .finish()
     }
 }
