@@ -1,6 +1,6 @@
 # Voluntary Servitude
 
-* [Documentation](https://docs.rs/voluntary-servitude/3.0.10/voluntary-servitude)
+* [Documentation](https://docs.rs/voluntary-servitude/3.0.11/voluntary-servitude)
 
 # Features
  - Atomic abstractions (`Atomic`, `AtomicOption`, `FillOnceAtomicOption`, `FillOnceAtomicArc`)
@@ -24,7 +24,7 @@ A safe `AtomicArc` is impossible without a garbage collector, so you must use `A
 
 ## Licenses
 
-[MIT](LICENSE_MIT) and [Apache-2.0](LICENSE_APACHE)
+[MIT](master/license/MIT) and [Apache-2.0](master/license/APACHE)
 
 ## `VoluntaryServitude` Examples
 

@@ -22,7 +22,7 @@ use serde_lib::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, fmt::Formatter, marker::PhantomData};
 use voluntary_servitude::{Inner, VoluntaryServitude};
 
-/// Abstracts serializer visitor
+/// Abstracts deserializer visitor
 struct InnerVisitor<'a, T: 'a + Deserialize<'a>>(pub PhantomData<&'a T>);
 
 impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {

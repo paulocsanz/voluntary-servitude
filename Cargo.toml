@@ -1,6 +1,6 @@
 [package]
 name = "voluntary-servitude"
-version = "3.0.10"
+version = "3.0.11"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
@@ -8,11 +8,6 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["lock-free", "data-structure", "iterator", "vector", "thread-safe"]
 categories = ["concurrency", "data-structures"]
-
-[profile.release]
-lto = true
-panic = 'abort'
-opt-level = 3
 
 [lib]
 name = "voluntary_servitude"
