@@ -62,6 +62,7 @@ impl<T> Iter<T> {
     }
 
     /// Returns mutable reference, allowing iteration
+    #[inline]
     pub fn iter(&mut self) -> &mut Self {
         self
     }
