@@ -7,7 +7,8 @@
  - Thread-safe appendable list with a lock-free iterator (`VoluntaryServitude` - also called `VS`)
  - Serde serialization (`serde-traits` feature)
  - `par_extend`, `from_par_iter` rayon implementation
- - Use `VoluntaryServitude` from C (FFI) ("ffi feature")
+ - ~~Use `VoluntaryServitude` from C (FFI) ("ffi feature")~~
+  **This feature is disabled for now, there was a UB in the interface (dropping the pointer, it will be solved when I have time to it)**
  - Logging (`logs` feature)
 
 # Atomic abstractions

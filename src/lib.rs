@@ -6,6 +6,7 @@
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Use VoluntaryServitude from C (FFI) ("ffi" feature)`] (also in **./examples**)
+//!    **This feature is disable until a UB in the interface is solved (droppping the pointer)**
 //!  - [`Logging ("logs" feature)`]
 //!
 //! # Atomic abstractions
