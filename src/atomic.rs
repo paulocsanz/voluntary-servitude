@@ -1,11 +1,27 @@
 //! Atomic `Box<T>`
+//!
+//! It can't provide a reference to the current value since it may be dropped at any time
+//!
+//! You must swap the element to access it
+//!
+//! [`FillOnceAtomicOption`] provides a API that enables access to the reference, but only enables `try_store` to write to it
+//!
+//! [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
 
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::ptr::{null_mut, NonNull};
 use std::{marker::PhantomData, mem::drop, sync::atomic::AtomicPtr, sync::atomic::Ordering};
 use IntoPtr;
 
-/// Atomic abstractions of a `Box<T>`
+/// Atomic `Box<T>`
+///
+/// It can't provide a reference to the current value since it may be dropped at any time
+///
+/// You must swap the element to access it
+///
+/// [`FillOnceAtomicOption`] provides a API that enables access to the reference, but only enables `try_store` to write to it
+///
+/// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
 pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
 
 impl<T: Debug> Debug for Atomic<T> {
@@ -27,12 +43,15 @@ impl<T> Atomic<T> {
     /// ```rust
     /// # use voluntary_servitude::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let filled = Atomic::from(10);
+    /// let filled = Atomic::new(10);
     /// assert_eq!(*filled.into_inner(), 10);
     /// ```
     #[inline]
-    pub fn new(data: Box<T>) -> Self {
-        Self::from(data)
+    pub fn new<V>(data: V) -> Self
+    where
+        V: Into<Box<T>>
+    {
+        Self::from(data.into())
     }
 
     /// Stores value into `Atomic` and drops old one
@@ -40,15 +59,18 @@ impl<T> Atomic<T> {
     /// [`Atomic`]: ./struct.Atomic.html
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::sync::atomic::Ordering;
     /// let filled = Atomic::from(10);
-    /// filled.store(5.into(), Ordering::SeqCst);
+    /// filled.store(5, Ordering::SeqCst);
     /// assert_eq!(*filled.into_inner(), 5);
     /// ```
     #[inline]
-    pub fn store(&self, new: Box<T>, order: Ordering) {
+    pub fn store<V>(&self, new: V, order: Ordering)
+    where
+        V: Into<Box<T>>
+    {
         drop(self.swap(new, order))
     }
 
@@ -57,12 +79,17 @@ impl<T> Atomic<T> {
     /// ```rust
     /// # use voluntary_servitude::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::sync::atomic::Ordering;
     /// let option = Atomic::from(10);
-    /// assert_eq!(*option.into_inner(), 10);
+    /// assert_eq!(*option.swap(4, Ordering::SeqCst), 10);
+    /// assert_eq!(*option.into_inner(), 4);
     /// ```
     #[inline]
-    pub fn swap(&self, new: Box<T>, order: Ordering) -> Box<T> {
-        unsafe { self.inner_swap(new.into_ptr(), order) }
+    pub fn swap<V>(&self, new: V, order: Ordering) -> Box<T>
+    where
+        V: Into<Box<T>>
+    {
+        unsafe { self.inner_swap(new.into().into_ptr(), order) }
     }
 
     /// Converts itself into a `Box<T>`
@@ -87,10 +114,10 @@ impl<T> Atomic<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use std::ptr::null_mut;
     /// # use voluntary_servitude::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = unsafe { Atomic::<()>::from_raw(null_mut()) };
+    /// use std::ptr::null_mut;
+    /// let empty: Option<Atomic<()>> = unsafe { Atomic::from_raw(null_mut()) };
     /// assert!(empty.is_none());
     ///
     /// let filled = unsafe { Atomic::from_raw(Box::into_raw(Box::new(10))) };
@@ -121,6 +148,7 @@ impl<T> Atomic<T> {
     #[inline]
     pub unsafe fn from_raw_unchecked(ptr: *mut T) -> Self {
         debug!("from_raw_unchecked({:p})", ptr);
+        debug_assert!(!ptr.is_null());
         Atomic(AtomicPtr::new(ptr), PhantomData)
     }
 
@@ -136,9 +164,9 @@ impl<T> Atomic<T> {
     /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
     ///
     /// ```rust
-    /// # use std::{sync::atomic::Ordering, ptr::null_mut};
     /// # use voluntary_servitude::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { Atomic::<()>::from_raw_unchecked(null_mut()) };
     /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
     ///
@@ -153,27 +181,6 @@ impl<T> Atomic<T> {
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut T {
         self.0.load(order)
-    }
-
-    /// Empties `Atomic`, this function should probably never be called
-    ///
-    /// You should probably use [`into_inner`]
-    ///
-    /// # Safety
-    ///
-    /// This is extremely unsafe, you don't want to call this unless you are implementing `Drop` for a chained `T`
-    ///
-    /// All reference will endup invalidated and any function call other than dropping will cause UB
-    ///
-    /// This is useful to obtain ownership of the inner value and implement a custom drop
-    /// (like a linked list iteratively dropped - [`VS`])
-    ///
-    /// [`into_inner`]: #method.into_inner
-    /// [`VS`]: ./type.VS.html
-    #[inline]
-    pub unsafe fn dangle(&mut self) -> Box<T> {
-        info!("dangle()");
-        self.inner_swap(null_mut(), Ordering::SeqCst)
     }
 }
 
@@ -214,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_send() {
-        fn assert_send<T>() {}
+        fn assert_send<T: Send>() {}
         assert_send::<Atomic<()>>();
     }
 

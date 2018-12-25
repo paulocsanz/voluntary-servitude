@@ -1,6 +1,6 @@
 # Voluntary Servitude
 
-* [Documentation](https://docs.rs/voluntary-servitude/3.0.11/voluntary-servitude)
+* [Documentation](https://docs.rs/voluntary-servitude/4.0.0/voluntary-servitude)
 
 # Features
  - Atomic abstractions (`Atomic`, `AtomicOption`, `FillOnceAtomicOption`, `FillOnceAtomicArc`)
@@ -13,13 +13,13 @@
  - **Atomic** -> atomic `Box<T>`
  - **AtomicOption** -> atomic `Option<Box<T>>`
  - **FillOnceAtomicOption** -> atomic `Option<Box<T>>` that can give references (ideal for iterators)
- - **FillOnceAtomicArc** -> atomic `Option<Arc<T>>` with a limited Api (like `FillOnceAtomicOption`)
+ - **FillOnceAtomicArc** -> atomic `Option<Arc<T>>` with a limited API (like `FillOnceAtomicOption`)
 
 With `Atomic` and `AtomicOption` it's not safe to get a reference, you must replace the value to access it.
 
 To safely get a reference to T you must use `FillOnceAtomicOption` and accept the API limitations (initially `None` but can be filled once).
 
-A safe `AtomicArc` is impossible without a garbage collector, so you must use `ArcCell` from `crossbeam` (locks to clone), some data-structure from `arc-swap` or `FillOnceAtomicArc` and accept the limited Api.
+For a safe `AtomicArc` you must use some data-structure from `arc-swap`, `RwLock/Mutex` from `parking_lot` (or `std`, which is slower but the standard) or `FillOnceAtomicArc` and accept the limited API (2018).
 
 ## Licenses
 
@@ -39,7 +39,7 @@ extern crate voluntary_servitude;
 fn main() {
     let (a, b, c) = (0usize, 1usize, 2usize);
     // VS alias to VoluntaryServitude
-    // vs! alias to voluntary_servitude! (and operate like vec!)
+    // vs! alias to voluntary_servitude! (and operates like vec!)
     let list = vs![a, b, c];
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 
@@ -54,7 +54,7 @@ fn main() {
 
     // You can get the current iteration index
     // iter.next() == iter.len() means iteration ended (iter.next() == None)
-    let mut iter = list.iter();
+    let mut iter = &mut list.iter();
     assert_eq!(iter.index(), 0);
     assert_eq!(iter.next(), Some(&0));
     assert_eq!(iter.index(), 1);
@@ -65,11 +65,13 @@ fn main() {
     assert_eq!(iter.len(), 3);
     assert_eq!(list.len(), 0);
     assert_eq!(list.iter().len(), 0);
-    assert_eq!(list.iter().next(), None);
+    assert_eq!((&mut list.iter()).next(), None);
+
+    println!("Single thread example ended without errors");
 }
 ```
 
-### Multi producers, multi consumers
+### Multi-producer, multi-consumer
 
 ```rust
 #[macro_use]
@@ -109,6 +111,6 @@ fn main() {
         handler.join().expect("Failed to join thread");
     }
 
-    println!("Multi-thread rust example ended without errors");
+    println!("Multi-thread example ended without errors");
 }
 ```

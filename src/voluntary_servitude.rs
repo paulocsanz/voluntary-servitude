@@ -25,6 +25,7 @@ unsafe impl<T: Send> Send for Inner<T> {}
 impl<T> Default for Inner<T> {
     #[inline]
     fn default() -> Self {
+        trace!("default()");
         Self {
             size: AtomicUsize::new(0),
             first_node: FillOnceAtomicOption::default(),
@@ -61,6 +62,7 @@ impl<T> Inner<T> {
     /// Atomically checks if `Inner`'s size is `0`
     #[inline]
     pub fn is_empty(&self) -> bool {
+        trace!("is_empty()");
         self.len() == 0
     }
 
@@ -84,10 +86,11 @@ impl<T> Inner<T> {
     #[inline]
     pub unsafe fn append_chain(&self, first: *mut Node<T>, last: *mut Node<T>, length: usize) {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
-        let _ = self
-            .swap_last(last)
-            .or_else(|| self.set_first(Box::from_raw(first)).ok().and(None))
-            .map(|nn| nn.as_ref().set_next(Box::from_raw(first)));
+        if let Some(nn) = self.swap_last(last) {
+            nn.as_ref().set_next(Box::from_raw(first))
+        } else {
+            let _ = self.set_first(Box::from_raw(first));
+        }
 
         info!("Increased size by {}", length);
         let _ = self.size.fetch_add(length, Ordering::SeqCst);
@@ -105,7 +108,7 @@ impl<T> Inner<T> {
     pub fn into_inner(mut self) -> (usize, *mut Node<T>, *mut Node<T>) {
         trace!("into_inner()");
         let size = self.size.swap(0, Ordering::SeqCst);
-        let first = unsafe { self.first_node.dangle().into_ptr() };
+        let first = self.first_node.take(Ordering::SeqCst).into_ptr();
         let last = self.last_node.swap(null_mut(), Ordering::SeqCst);
         (size, first, last)
     }
@@ -116,7 +119,9 @@ impl<T> FromIterator<T> for Inner<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         trace!("FromIterator<T>");
         let inner = Self::default();
-        let _ = iter.into_iter().map(|v| inner.append(v)).count();
+        for element in iter {
+            inner.append(element);
+        }
         inner
     }
 }
@@ -139,7 +144,7 @@ impl<T> FromIterator<T> for Inner<T> {
 /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
 /// let (a, b, c) = (0usize, 1usize, 2usize);
 /// // VS alias to VoluntaryServitude
-/// // vs! alias to voluntary_servitude! (and operate like vec!)
+/// // vs! alias to voluntary_servitude! (and operates like vec!)
 /// let list = vs![a, b, c];
 /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 ///
@@ -210,7 +215,7 @@ impl<T> FromIterator<T> for Inner<T> {
 ///         handler.join().expect("Failed to join thread");
 ///     }
 ///
-///     println!("Multi-thread rust example ended without errors");
+///     println!("Multi-thread example ended without errors");
 /// }
 /// ```
 pub struct VoluntaryServitude<T>(RwLock<Arc<Inner<T>>>);
@@ -221,27 +226,62 @@ pub struct VoluntaryServitude<T>(RwLock<Arc<Inner<T>>>);
 pub type VS<T> = VoluntaryServitude<T>;
 
 impl<T> VoluntaryServitude<T> {
-    /// Empties list, returning its Inner if it's the last one
+    /// Creates new empty `VS` (like `Default` trait)
     ///
-    /// It's used to manually drop each element (like in FFI)
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::VS;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list: VS<()> = VS::new();
+    /// assert!(list.is_empty());
+    /// ```
     #[inline]
-    pub fn try_unwrap(&self) -> Option<Inner<T>> {
-        let mut write = self.0.write();
-        let old = write.clone();
-        *write = Arc::new(Inner::default());
-        Arc::try_unwrap(old).ok()
-    }
-
-    /// Creates new `VoluntaryServitude` from [`Inner`]
-    ///
-    /// [`Inner`]: ./struct.Inner.html
-    #[inline]
-    pub(crate) fn new(inner: Inner<T>) -> Self {
+    pub fn new() -> Self {
         trace!("new()");
-        VoluntaryServitude(RwLock::new(Arc::new(inner)))
+        Self::default()
     }
 
-    /// Returns current size, be careful with race conditions when using it
+    /// Inserts element after last node
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![];
+    /// let mut iter = list.iter();
+    ///
+    /// list.append(3);
+    /// // Iter doesn't grow if it's empty (originally empty or was consumed)
+    /// assert!(iter.is_empty());
+    ///
+    /// iter = list.iter();
+    /// list.append(8);
+    /// // Iter grows if it has not been consumed
+    /// assert_eq!(iter.collect::<Vec<_>>(), vec![&3, &8]);
+    /// ```
+    #[inline]
+    pub fn append(&self, value: T) {
+        self.0.read().append(value);
+    }
+
+    /// Makes lock-free iterator based on `VS`
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let list = vs![3, 2];
+    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
+    ///
+    /// for (element, expected) in list.iter().zip(&[3, 2][..]) {
+    ///     assert_eq!(element, expected);
+    /// }
+    /// ```
+    #[inline]
+    pub fn iter(&self) -> Iter<T> {
+        debug!("iter()");
+        Iter::from(self.0.read().clone())
+    }
+
+    /// Returns current size, be careful with race conditions when using it since other threads can change it right after the read
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -258,7 +298,7 @@ impl<T> VoluntaryServitude<T> {
         self.0.read().len()
     }
 
-    /// Checks if `VS` is currently empty, be careful with race conditions when using it
+    /// Checks if `VS` is currently empty, be careful with race conditions when using it since other threads can change it right after the read
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -273,41 +313,7 @@ impl<T> VoluntaryServitude<T> {
         self.0.read().is_empty()
     }
 
-    /// Inserts element after last node
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![];
-    /// let mut iter = list.iter();
-    /// list.append(3);
-    /// assert!(iter.is_empty());
-    /// iter = list.iter();
-    /// list.append(8);
-    /// assert_eq!(iter.collect::<Vec<_>>(), vec![&3, &8]);
-    /// ```
-    #[inline]
-    pub fn append(&self, value: T) {
-        self.0.read().append(value);
-    }
-
-    /// Makes lock-free iterator based on `VS`
-    ///
-    /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![3, 2];
-    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
-    /// for (index, element) in list.iter().enumerate() {
-    ///     assert_eq!(*element, [3, 2][index]);
-    /// }
-    /// ```
-    #[inline]
-    pub fn iter(&self) -> Iter<T> {
-        Iter::new(self.0.read().clone())
-    }
-
-    /// Clears list (iterators referencing old chain will still work)
+    /// Clears list (iterators referencing the old chain will still work)
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -325,7 +331,7 @@ impl<T> VoluntaryServitude<T> {
         *self.0.write() = Arc::new(Inner::default());
     }
 
-    /// Clears list returning iterator to it
+    /// Clears list returning iterator to it (other iterators referencing the old chain will still work)
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -339,13 +345,12 @@ impl<T> VoluntaryServitude<T> {
     #[inline]
     pub fn empty(&self) -> Iter<T> {
         debug!("empty()");
-        let mut write = self.0.write();
-        let old = write.clone();
-        *write = Arc::new(Inner::default());
-        Iter::new(old)
+        let old = Self::default();
+        self.swap(&old);
+        old.iter()
     }
 
-    /// Replaces `VS`
+    /// Swaps two `VS`
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -358,11 +363,11 @@ impl<T> VoluntaryServitude<T> {
     /// ```
     #[inline]
     pub fn swap(&self, other: &Self) {
-        debug!("empty()");
+        debug!("swap({:p})", other);
         swap(&mut *self.0.write(), &mut *other.0.write());
     }
 
-    /// Extends `VS` like the `Extend` trait, but without needing a mutable reference
+    /// Extends `VS` like the `Extend` trait, but without a mutable reference
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -371,13 +376,13 @@ impl<T> VoluntaryServitude<T> {
     /// list.extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     ///
+    /// // You can extend from another `VS` if you clone (or copy) each element
     /// let list = vs![1, 2, 3];
     /// list.extend(vs![4, 5, 6].iter().cloned());
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
-    ///
-    /// let list = vs![1, 2, 3];
-    /// list.extend(vec![&4, &5, &6].into_iter().cloned());
-    /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
+    /// # let list = vs![1, 2, 3];
+    /// # list.extend(vec![&4, &5, &6].into_iter().cloned());
+    /// # assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
     /// ```
     #[inline]
     pub fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
@@ -390,7 +395,8 @@ impl<T> VoluntaryServitude<T> {
 impl<T> Default for VoluntaryServitude<T> {
     #[inline]
     fn default() -> Self {
-        Self::new(Inner::default())
+        trace!("default()");
+        Self::from(Inner::default())
     }
 }
 
@@ -420,7 +426,7 @@ impl<'a, T: 'a + Copy> Extend<&'a T> for VoluntaryServitude<T> {
 impl<T> FromIterator<T> for VoluntaryServitude<T> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self::new(Inner::from_iter(iter))
+        Self::from(Inner::from_iter(iter))
     }
 }
 
@@ -428,6 +434,14 @@ impl<'a, T: 'a + Copy> FromIterator<&'a T> for VoluntaryServitude<T> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = &'a T>>(iter: I) -> Self {
         Self::from_iter(iter.into_iter().cloned())
+    }
+}
+
+impl<T> From<Inner<T>> for VoluntaryServitude<T> {
+    #[inline]
+    fn from(inner: Inner<T>) -> Self {
+        trace!("From<Inner<T>>");
+        VoluntaryServitude(RwLock::new(Arc::new(inner)))
     }
 }
 
@@ -477,7 +491,7 @@ mod tests {
 
     #[test]
     fn test_send() {
-        fn assert_send<T>() {}
+        fn assert_send<T: Send>() {}
         assert_send::<VoluntaryServitude<()>>();
     }
 

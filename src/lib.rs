@@ -11,18 +11,18 @@
 //!  - [`Atomic`] -> atomic `Box<T>`
 //!  - [`AtomicOption`] -> atomic `Option<Box<T>>`
 //!  - [`FillOnceAtomicOption`] -> atomic `Option<Box<T>>` that can give references (ideal for iterators)
-//!  - [`FillOnceAtomicArc`] -> atomic `Option<Arc<T>>` with a limited Api (like [`FillOnceAtomicOption`])
+//!  - [`FillOnceAtomicArc`] -> atomic `Option<Arc<T>>` with a limited API (like [`FillOnceAtomicOption`])
 //!
 //! With [`Atomic`] and [`AtomicOption`] it's not safe to get a reference, you must replace the value to access it.
 //!
-//! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations.
+//! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations (initially `None` but can be filled once).
 //!
-//! A safe `AtomicArc` is impossible without a garbage collector, so you must use `ArcCell` from `crossbeam` (locks to clone), some data-structure from `arc-swap` or [`FillOnceAtomicArc`] and accept the limited Api.
+//! For a safe `AtomicArc` you must use some data-structure from `arc-swap`, `RwLock/Mutex` from `parking_lot` (or `std`, which is slower but the standard) or [`FillOnceAtomicArc`] and accept the limited API (2018).
 //!
 //! # Thread-safe appendable list that can create a lock-free iterator
 //!  - [`VoluntaryServitude`] (also called [`VS`])
 //!
-//! # Api of `VS` Iterator
+//! # API of `VS` Iterator
 //! - [`Iter`]
 //!
 //! [`Atomic`]: ./struct.Atomic.html
@@ -66,7 +66,7 @@
     unused_parens,
     while_true
 )]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/3.0.11/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.0/voluntary-servitude")]
 
 #[cfg(feature = "rayon-traits")]
 extern crate rayon as rayon_lib;
@@ -83,8 +83,6 @@ extern crate log;
 extern crate env_logger;
 
 /// Setup logger according to `RUST_LOG` env var
-///
-/// *During tests log to stdout to supress output on passes*
 ///
 /// # Enable the feature:
 ///
@@ -192,18 +190,5 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
     #[must_use]
     fn into_ptr(self) -> *mut T {
         self.map_or(null_mut(), Box::into_raw)
-    }
-}
-
-/// Abstracts conditional execution
-pub(crate) trait AlsoRun<T> {
-    /// Runs closure conditionally
-    fn also_run<P: FnMut(&T)>(self, func: P) -> Self;
-}
-
-impl<T> AlsoRun<T> for Option<T> {
-    #[inline]
-    fn also_run<P: FnMut(&T)>(self, mut func: P) -> Self {
-        self.filter(|t| (func(t), true).1)
     }
 }

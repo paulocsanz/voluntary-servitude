@@ -4,21 +4,24 @@ use rayon_lib::prelude::*;
 use {VoluntaryServitude, VS};
 
 impl<T: Send + Sync> VoluntaryServitude<T> {
-    /// Parallely Extends [`VS`] like the ParallelExtend trait, but without a mutable reference
+    /// Parallely Extends [`VS`] like the `ParallelExtend` trait, but without a mutable reference
     ///
     /// [`VS`]: ./type.VS.html
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let list = vs![1u8, 2, 3];
+    /// let list = vs![1, 2, 3];
     /// list.par_extend(vec![4, 5, 6]);
-    /// assert_eq!(list.iter().sum::<u8>(), 21u8);
+    /// assert_eq!(list.iter().sum::<i32>(), 21);
     /// ```
     #[cfg(feature = "rayon-traits")]
     #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
     #[inline]
-    pub fn par_extend<I: IntoParallelIterator<Item = T>>(&self, par_iter: I) {
+    pub fn par_extend<I>(&self, par_iter: I)
+    where
+        I: IntoParallelIterator<Item = T>
+    {
         trace!("par_extend()");
         par_iter.into_par_iter().for_each(|el| self.append(el));
     }

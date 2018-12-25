@@ -69,7 +69,7 @@ impl<T: Serialize> Serialize for VoluntaryServitude<T> {
 impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
     #[inline]
     fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
-        Inner::deserialize(des).map(Self::new)
+        Inner::deserialize(des).map(Self::from)
     }
 }
 

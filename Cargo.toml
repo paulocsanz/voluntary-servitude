@@ -1,6 +1,6 @@
 [package]
 name = "voluntary-servitude"
-version = "3.0.12"
+version = "4.0.0"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
@@ -14,19 +14,11 @@ name = "voluntary_servitude"
 crate_type = ["lib"]
 
 [dev-dependencies]
-#criterion = "0.2"
+criterion = "0.2"
 
-#[[bench]]
-#name = "read_heavy"
-#harness = false
-
-#[[bench]]
-#name = "write_heavy"
-#harness = false
-
-#[[bench]]
-#name = "equal"
-#harness = false
+[[bench]]
+name = "vs_each"
+harness = false
 
 [dependencies]
 parking_lot = "0.2"

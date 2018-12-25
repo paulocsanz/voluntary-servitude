@@ -11,24 +11,29 @@ use {Atomic, AtomicOption, NotEmpty};
 /// Atomic abstraction of a `Option<Box<T>>` that can provide access to a `Option<&T>`
 ///
 /// This is ideal for a iterator or some consumer that doesn't actually consume the data
+///
+/// To make that possible the API is heavily limited (can only write to it through `try_store`
 pub struct FillOnceAtomicOption<T>(AtomicOption<T>);
 
 impl<T> FillOnceAtomicOption<T> {
     /// Creates new `FillOnceAtomicOption`
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicOption::<()>::default();
+    /// use std::sync::atomic::Ordering;
+    /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
-    /// let filled = FillOnceAtomicOption::new(Some(10.into()));
+    /// let filled = FillOnceAtomicOption::new(Box::new(10));
     /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
     /// ```
     #[inline]
-    pub fn new(data: Option<Box<T>>) -> Self {
-        Self::from(data)
+    pub fn new<V>(data: V) -> Self
+    where
+        V: Into<Option<Box<T>>>
+    {
+        Self::from(data.into())
     }
 
     /// Stores new value if `FillOnceAtomicOption` was not initialized (contains a `None`)
@@ -36,21 +41,46 @@ impl<T> FillOnceAtomicOption<T> {
     /// This operation is implemented as a single atomic `compare_and_swap`.
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicOption::default();
-    /// let old = option.try_store(5.into(), Ordering::SeqCst);
+    /// let old = option.try_store(5, Ordering::SeqCst);
     /// assert!(old.is_ok());
     /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
     ///
-    /// let failed_to_store = option.try_store(10.into(), Ordering::SeqCst);
+    /// let failed_to_store = option.try_store(10, Ordering::SeqCst);
     /// assert!(failed_to_store.is_err());
     /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
     /// ```
     #[inline]
-    pub fn try_store(&self, data: Box<T>, order: Ordering) -> Result<(), NotEmpty> {
+    pub fn try_store<V>(&self, data: V, order: Ordering) -> Result<(), NotEmpty>
+    where
+        V: Into<Box<T>>
+    {
         self.0.try_store(data, order)
+    }
+
+    /// Replaces `FillOnceAtomicOption` value with `None` returning old value
+    ///
+    /// As opposed to [`take`] from [`AtomicOption`]
+    ///
+    /// [`take`]: ./struct.AtomicOption.html#method.take
+    /// [`AtomicOption`]: ./struct.AtomicOption.html
+    ///
+    /// ```rust
+    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::sync::atomic::Ordering;
+    /// let mut option = FillOnceAtomicOption::from(5);
+    /// assert_eq!(option.take(Ordering::SeqCst), Some(Box::new(5)));
+    /// assert_eq!(option.take(Ordering::SeqCst), None);
+    /// # assert_eq!(option.take(Ordering::SeqCst), None);
+    /// ```
+    #[inline]
+    pub fn take(&mut self, order: Ordering) -> Option<Box<T>> {
+        info!("empty()");
+        self.0.take(order)
     }
 }
 
@@ -58,10 +88,10 @@ impl<T: Copy> FillOnceAtomicOption<T> {
     /// Returns a copy of the wrapped `T`
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicOption::<()>::new(None);
+    /// use std::sync::atomic::Ordering;
+    /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.load(Ordering::SeqCst), None);
     ///
     /// let filled = FillOnceAtomicOption::from(10);
@@ -77,10 +107,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// Atomically extracts a reference to the element stored
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicOption::<()>::new(None);
+    /// use std::sync::atomic::Ordering;
+    /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
     /// let filled = FillOnceAtomicOption::from(10);
@@ -115,13 +145,13 @@ impl<T> FillOnceAtomicOption<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use std::{sync::atomic::Ordering, ptr::null_mut};
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicOption::<()>::from_raw(null_mut()) };
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
-    /// let filled = unsafe { FillOnceAtomicOption::from_raw(Box::into_raw(Box::new(10))) };
+    /// let filled = unsafe { FillOnceAtomicOption::from_raw(Box::into_raw(10.into())) };
     /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
     /// ```
     #[inline]
@@ -140,10 +170,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized or dropped)
     ///
     /// ```rust
-    /// # use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// # use voluntary_servitude::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicOption::<()>::new(None);
+    /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
+    /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
     ///
     /// let filled = FillOnceAtomicOption::from(10);
@@ -152,31 +182,6 @@ impl<T> FillOnceAtomicOption<T> {
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut T {
         self.0.get_raw(order)
-    }
-
-    /// Empties `FillOnceAtomicOption`, this function should probably never be called
-    ///
-    /// You should probably use [`into_inner`]
-    ///
-    /// # Safety
-    ///
-    /// This is extremely unsafe, you don't want to call this unless you are implementing `Drop` for a chained `T`
-    ///
-    /// All reference will endup invalidated and any function call other than [`try_store`] (or dropping) will cause UB
-    ///
-    /// In a multi-thread environment it's very hard to ensure that this won't happen
-    ///
-    /// This is useful to obtain ownership of the inner value and implement a custom drop
-    /// (like a linked list iteratively dropped - [`VS`])
-    ///
-    /// [`into_inner`]: #method.into_inner
-    /// [`dangle`]: #method.dangle
-    /// [`try_store`]: #method.try_store
-    /// [`VS`]: ./type.VS.html
-    #[inline]
-    pub unsafe fn dangle(&mut self) -> Option<Box<T>> {
-        info!("dangle()");
-        self.0.swap(None, Ordering::SeqCst)
     }
 }
 
@@ -266,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_send() {
-        fn assert_send<T>() {}
+        fn assert_send<T: Send>() {}
         assert_send::<FillOnceAtomicOption<()>>();
     }
 

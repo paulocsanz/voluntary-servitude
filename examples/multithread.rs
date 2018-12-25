@@ -26,9 +26,7 @@ fn main() {
         handlers.push(spawn(move || loop {
             let count = consumer.iter().count();
             println!("{} elements", count);
-            if count >= TOTAL {
-                break;
-            };
+            if count >= TOTAL { break };
         }));
     }
 
@@ -37,5 +35,5 @@ fn main() {
         handler.join().expect("Failed to join thread");
     }
 
-    println!("Multi-thread rust example ended without errors");
+    println!("Multi-thread example ended without errors");
 }

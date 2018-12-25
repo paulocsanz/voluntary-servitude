@@ -1,32 +1,34 @@
 //! Atomic `Option<Arc<T>>` that can only be filled once
 //!
-//! Since `FillOnceAtomicArc` can only be filled once it's safe to provide access to the inner `Option<Arc<T>>`
+//! Since `FillOnceAtomicArc` can only be filled once it's safe to provide access to the inner `Option<Arc<T>>` and `Option<&T>`
 
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ops::Deref, sync::atomic::Ordering, sync::Arc};
 use {FillOnceAtomicOption, NotEmpty};
 
-/// Atomic abstractions of a `Option<Arc<T>>` that can provide access to a cloned `Option<Arc<T>>`
-/// and a `Option<&T>`
+/// Atomic abstraction of a `Option<Arc<T>>` that can provide access to a cloned `Option<Arc<T>>` and a `Option<&T>`
 pub struct FillOnceAtomicArc<T>(FillOnceAtomicOption<Arc<T>>);
 
 impl<T> FillOnceAtomicArc<T> {
     /// Creates new `FillOnceAtomicArc`
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicArc::<()>::default();
+    /// use std::sync::{Arc, atomic::Ordering};
+    /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
-    /// let filled = FillOnceAtomicArc::from(10);
+    /// let filled = FillOnceAtomicArc::new(Arc::new(10));
     /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
     /// ```
     #[inline]
-    pub fn new(data: Option<Arc<T>>) -> Self {
+    pub fn new<V>(data: V) -> Self
+    where
+        V: Into<Option<Arc<T>>>
+    {
         trace!("new()");
-        Self::from(data)
+        Self::from(data.into())
     }
 
     /// Stores new `Arc<T>` if `FillOnceAtomicArc` currently contains a `None`
@@ -34,34 +36,37 @@ impl<T> FillOnceAtomicArc<T> {
     /// This operation is implemented as a single atomic `compare_and_swap`.
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicArc::default();
-    /// let old = option.try_store(5.into(), Ordering::SeqCst);
+    /// let old = option.try_store(5, Ordering::SeqCst);
     /// assert!(old.is_ok());
     /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
     ///
-    /// let failed_to_store = option.try_store(10.into(), Ordering::SeqCst);
+    /// let failed_to_store = option.try_store(10, Ordering::SeqCst);
     /// assert!(failed_to_store.is_err());
     /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
     /// ```
     #[inline]
-    pub fn try_store(&self, data: Arc<T>, order: Ordering) -> Result<(), NotEmpty> {
-        self.0.try_store(Box::new(data), order)
+    pub fn try_store<V>(&self, data: V, order: Ordering) -> Result<(), NotEmpty>
+    where
+        V: Into<Arc<T>>
+    {
+        self.0.try_store(data.into(), order)
     }
 
     /// Atomically retrieves a cloned `Option<Arc<T>>`
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicArc::<()>::new(None);
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// use std::sync::atomic::Ordering;
+    /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
+    /// assert_eq!(empty.load(Ordering::SeqCst), None);
     ///
     /// let filled = FillOnceAtomicArc::from(10);
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.load(Ordering::SeqCst).map(|a| *a), Some(10));
     /// ```
     #[inline]
     pub fn load(&self, order: Ordering) -> Option<Arc<T>> {
@@ -71,10 +76,10 @@ impl<T> FillOnceAtomicArc<T> {
     /// Atomically extracts a reference to the element stored
     ///
     /// ```rust
-    /// # use std::sync::atomic::Ordering;
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicArc::<()>::new(None);
+    /// use std::sync::atomic::Ordering;
+    /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
     /// let filled = FillOnceAtomicArc::from(10);
@@ -107,9 +112,9 @@ impl<T> FillOnceAtomicArc<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use std::{sync::atomic::Ordering, ptr::null_mut, sync::Arc};
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// use std::{sync::Arc, sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicArc::<()>::from_raw(null_mut()) };
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
     ///
@@ -134,10 +139,10 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     ///
     /// ```rust
-    /// # use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// # use voluntary_servitude::FillOnceAtomicArc;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let empty = FillOnceAtomicArc::<()>::new(None);
+    /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
+    /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
     /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
     ///
     /// let filled = FillOnceAtomicArc::from(10);
@@ -200,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_send() {
-        fn assert_send<T>() {}
+        fn assert_send<T: Send>() {}
         assert_send::<FillOnceAtomicArc<()>>();
     }
 

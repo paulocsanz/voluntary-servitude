@@ -4,7 +4,7 @@ extern crate voluntary_servitude;
 fn main() {
     let (a, b, c) = (0usize, 1usize, 2usize);
     // VS alias to VoluntaryServitude
-    // vs! alias to voluntary_servitude! (and operate like vec!)
+    // vs! alias to voluntary_servitude! (and operates like vec!)
     let list = vs![a, b, c];
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![&a, &b, &c]);
 
@@ -31,4 +31,6 @@ fn main() {
     assert_eq!(list.len(), 0);
     assert_eq!(list.iter().len(), 0);
     assert_eq!((&mut list.iter()).next(), None);
+
+    println!("Single thread example ended without errors");
 }

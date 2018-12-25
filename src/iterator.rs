@@ -4,10 +4,30 @@
 //! [`VS`]: ./type.VS.html
 
 use std::fmt::{self, Debug, Formatter};
-use std::{iter::FusedIterator, mem::replace, ptr::NonNull, sync::Arc};
-use {node::Node, voluntary_servitude::Inner, AlsoRun};
+use std::{iter::FusedIterator, ptr::NonNull, sync::Arc};
+use {node::Node, voluntary_servitude::Inner};
 
 /// Lock-free iterator based on [`VS`]
+///
+/// To ensure it can exist after `VS` `Iterator` is implemented for `&mut Iter<T>`, so you may have to iterate over `&mut Iter<T>`
+///
+/// ```rust
+/// # #[macro_use] extern crate voluntary_servitude;
+/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// let vs = vs![3, 4, 5];
+/// for number in &mut vs.iter() {
+///     println!("Number: {}", number);
+/// }
+/// ```
+///
+/// That can be avoided with iterator combinators
+///
+/// ```rust
+/// # #[macro_use] extern crate voluntary_servitude;
+/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// let vs = vs![3, 4, 5];
+/// let _ = vs.iter().map(|n| println!("Number: {}", n)).count();
+/// ```
 ///
 /// [`VS`]: ./type.VS.html
 #[derive(Clone)]
@@ -33,63 +53,37 @@ impl<T: Debug> Debug for Iter<T> {
     }
 }
 
-impl<T> Iter<T> {
-    /// Empties list, returning its Inner if it's the last one
-    ///
-    /// It's used to manually drop each element (like in FFI)
+impl<T> From<Arc<Inner<T>>> for Iter<T> {
     #[inline]
-    pub fn try_unwrap(&mut self) -> Option<Inner<T>> {
-        trace!("try_unwrap");
-        self.current = None;
-        Arc::try_unwrap(replace(&mut self.inner, Arc::new(Inner::default()))).ok()
-    }
-
-    /// Reference to last element in list
-    #[inline]
-    pub fn last_node(&self) -> Option<&T> {
-        self.inner.last_node().map(|nn| unsafe { (*nn.as_ptr()).value() })
-    }
-
-    /// Creates a new lock-free iterator
-    #[inline]
-    pub(crate) fn new(inner: Arc<Inner<T>>) -> Self {
-        trace!("new()");
+    fn from(inner: Arc<Inner<T>>) -> Self {
+        trace!("From<Arc<Inner<T>>>");
         Self {
             current: inner.first_node(),
             inner,
             index: 0,
         }
     }
+}
 
-    /// Returns mutable reference, allowing iteration
-    #[inline]
-    pub fn iter(&mut self) -> &mut Self {
-        self
-    }
-
-    /// Obtains current iterator index
+impl<T> Iter<T> {
+    /// Returns reference to last element in list
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
-    /// let vs = vs![3];
-    /// let mut iter = &mut vs.iter();
-    /// assert_eq!(iter.next(), Some(&3));
-    /// assert_eq!(iter.index(), 1);
-    /// assert!(iter.next().is_none());
-    /// assert_eq!(iter.index(), 1);
+    /// let vs = vs![2, 3, 4];
+    /// let iter = vs.iter();
+    /// assert_eq!(iter.last_node(), Some(&4));
     /// ```
     #[inline]
-    pub fn index(&self) -> usize {
-        trace!("index() = {}", self.index);
-        self.index
+    pub fn last_node(&self) -> Option<&T> {
+        trace!("last_node()");
+        self.inner.last_node().map(|nn| unsafe { (*nn.as_ptr()).value() })
     }
 
-    /// Returns current iterator size (may grow, but not decrease)
+    /// Returns current iterator size (may grow, but not decrease, be careful with race-conditions)
     ///
-    /// If `Iter` is empty it will never grow
-    ///
-    /// Length won't increase after iterator is emptied (`self.next() == None`)
+    /// If `Iter` was originally empty or was already consumed it will not grow (`FusedIterator`)
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -97,8 +91,10 @@ impl<T> Iter<T> {
     /// let vs = vs![3];
     /// let iter = vs.iter();
     /// assert_eq!(iter.len(), 1);
+    ///
     /// vs.append(2);
     /// vs.clear();
+    /// // Iterator is not cleared and will grow with original `VS`
     /// assert_eq!(iter.len(), 2);
     ///
     /// let mut iter2 = &mut vs.iter();
@@ -107,27 +103,33 @@ impl<T> Iter<T> {
     ///
     /// let iter = vs.iter();
     /// vs.append(2);
+    /// // Iterator is fused
     /// assert_eq!(iter.len(), 0);
     /// ```
     #[inline]
     pub fn len(&self) -> usize {
+        trace!("len()");
         self.current.map_or(self.index, |_| self.inner.len())
     }
 
-    /// Checks if iterator's length is 0 (it will always return the same value)
-    ///
-    /// If the iterator is empty, it will never grow
-    ///
-    /// If the iterator is filled, it will never be empty
+    /// Checks if iterator's length is empty (will return `None` on `next`)
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let vs = vs![3];
-    /// let iter = vs.iter();
+    ///
+    /// let mut iter = vs.iter();
     /// assert!(!iter.is_empty());
     /// vs.clear();
+    /// // Iterator isn't cleared with `VS` is
     /// assert!(!iter.is_empty());
+    ///
+    /// // Consumes iterator to make it empty
+    /// let _ = iter.count();
+    /// assert!(iter.is_empty());
+    ///
+    /// // Iterator is fused
     /// let iter = vs.iter();
     /// assert!(iter.is_empty());
     /// vs.append(2);
@@ -136,7 +138,30 @@ impl<T> Iter<T> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         trace!("is_empty()");
-        self.len() == 0
+        self.current.map_or(true, |_| self.len() == 0)
+    }
+
+    /// Obtains current iterator index
+    ///
+    /// ```rust
+    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// let vs = vs![3, 4];
+    /// let mut iter = &mut vs.iter();
+    ///
+    /// assert_eq!(iter.next(), Some(&3));
+    /// assert_eq!(iter.index(), 1);
+    /// assert_eq!(iter.next(), Some(&4));
+    /// assert_eq!(iter.index(), 2);
+    ///
+    /// // Index doesn't grow after iterator is consumed
+    /// assert!(iter.next().is_none());
+    /// assert_eq!(iter.index(), 2);
+    /// ```
+    #[inline]
+    pub fn index(&self) -> usize {
+        trace!("index() = {}", self.index);
+        self.index
     }
 }
 
@@ -147,14 +172,17 @@ impl<'a, T> Iterator for &'a mut Iter<T> {
     fn next(&mut self) -> Option<Self::Item> {
         trace!("next()");
 
-        let data = self
-            .current
-            .also_run(|_| self.index += 1)
-            .map(|ptr| unsafe { (*ptr.as_ptr()).value() });
-        //assert!(self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0);
-        //assert!((self.index <= self.inner.len() && data.is_some()) || self.index >= self.inner.len());
-        //assert!((self.index > self.inner.len() && data.is_none()) || self.index <= self.inner.len(), "{} {}", self.index, self.len());
+        let data = if let Some(ptr) = self.current {
+            self.index += 1;
+            Some(unsafe { (*ptr.as_ptr()).value() })
+        } else {
+            None
+        };
+
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
+        debug_assert!(self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0);
+        debug_assert!((self.index <= self.len() && data.is_some()) || self.index >= self.len());
+        debug_assert!((self.index > self.len() && data.is_none()) || self.index <= self.len());
 
         self.current = self
             .current

@@ -49,7 +49,9 @@ macro_rules! voluntary_servitude {
     () => ($crate::VS::default());
     ($elem: expr; $n: expr) => {{
         let vs = $crate::VS::default();
-        let _ = (0..$n).map(|_| vs.append($elem)).count();
+        for _ in 0..$n {
+            vs.append($elem);
+        }
         vs
     }};
     ($($x: expr),+) => (voluntary_servitude![$($x,)+]);

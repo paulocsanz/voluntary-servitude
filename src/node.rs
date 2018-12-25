@@ -54,9 +54,9 @@ impl<T> Drop for Node<T> {
     #[inline]
     fn drop(&mut self) {
         debug!("Drop nodes");
-        let mut node = unsafe { self.next.dangle() };
+        let mut node = self.next.take(Ordering::SeqCst);
         while let Some(mut n) = node {
-            node = unsafe { n.next.dangle() };
+            node = n.next.take(Ordering::SeqCst);
         }
     }
 }
