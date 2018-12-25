@@ -5,8 +5,6 @@
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
-//!  - [`Use VoluntaryServitude from C (FFI) ("ffi" feature)`] (also in **./examples**)
-//!    **This feature is disable until a UB in the interface is solved (droppping the pointer)**
 //!  - [`Logging ("logs" feature)`]
 //!
 //! # Atomic abstractions
@@ -15,12 +13,11 @@
 //!  - [`FillOnceAtomicOption`] -> atomic `Option<Box<T>>` that can give references (ideal for iterators)
 //!  - [`FillOnceAtomicArc`] -> atomic `Option<Arc<T>>` with a limited Api (like [`FillOnceAtomicOption`])
 //!
-//! With [`Atomic`] and [`AtomicOption`] it's not safe to get a reference, you must replace the
-//! value to access it
+//! With [`Atomic`] and [`AtomicOption`] it's not safe to get a reference, you must replace the value to access it.
 //!
-//! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations
+//! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations.
 //!
-//! A safe `AtomicArc` is impossible without a garbage collector, so you must use `ArcCell` from crossbeam (locks to clone) or [`FillOnceAtomicArc`]
+//! A safe `AtomicArc` is impossible without a garbage collector, so you must use `ArcCell` from `crossbeam` (locks to clone), some data-structure from `arc-swap` or [`FillOnceAtomicArc`] and accept the limited Api.
 //!
 //! # Thread-safe appendable list that can create a lock-free iterator
 //!  - [`VoluntaryServitude`] (also called [`VS`])
@@ -36,7 +33,6 @@
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
-//! [`Use VoluntaryServitude from C (FFI)`]: ./ffi/index.html
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
@@ -138,9 +134,6 @@ mod mock {
 mod macros;
 mod atomic;
 mod atomic_option;
-#[cfg(feature = "ffi")]
-#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "ffi")))]
-pub mod ffi;
 mod fill_once_atomic_arc;
 mod fill_once_atomic_option;
 mod iterator;

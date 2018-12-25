@@ -1,6 +1,6 @@
 [package]
 name = "voluntary-servitude"
-version = "3.0.11"
+version = "3.0.12"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"
@@ -11,7 +11,22 @@ categories = ["concurrency", "data-structures"]
 
 [lib]
 name = "voluntary_servitude"
-crate_type = ["lib", "cdylib", "staticlib"]
+crate_type = ["lib"]
+
+[dev-dependencies]
+#criterion = "0.2"
+
+#[[bench]]
+#name = "read_heavy"
+#harness = false
+
+#[[bench]]
+#name = "write_heavy"
+#harness = false
+
+#[[bench]]
+#name = "equal"
+#harness = false
 
 [dependencies]
 parking_lot = "0.2"
@@ -27,7 +42,6 @@ rayon-traits = ["rayon"]
 logs = ["log", "env_logger"]
 serde-traits = ["serde"]
 serde-tests = ["serde_json"]
-#ffi = []
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docs_rs_workaround"]
