@@ -1,6 +1,6 @@
 # Voluntary Servitude
 
-* [Documentation](https://docs.rs/voluntary-servitude/4.0.0/voluntary-servitude)
+* [Documentation](https://docs.rs/voluntary-servitude/4.0.1/voluntary-servitude)
 
 # Features
  - Atomic abstractions (`Atomic`, `AtomicOption`, `FillOnceAtomicOption`, `FillOnceAtomicArc`)

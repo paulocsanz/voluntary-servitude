@@ -15,12 +15,11 @@ impl<T: Send + Sync> VoluntaryServitude<T> {
     /// list.par_extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().sum::<i32>(), 21);
     /// ```
-    #[cfg(feature = "rayon-traits")]
     #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "rayon-traits")))]
     #[inline]
     pub fn par_extend<I>(&self, par_iter: I)
     where
-        I: IntoParallelIterator<Item = T>
+        I: IntoParallelIterator<Item = T>,
     {
         trace!("par_extend()");
         par_iter.into_par_iter().for_each(|el| self.append(el));
@@ -54,6 +53,15 @@ mod tests {
     fn setup_logger() {
         #[cfg(feature = "logs")]
         ::setup_logger();
+    }
+
+    #[test]
+    fn par_extend() {
+        setup_logger();
+        let vs = vs![1, 2, 3, 4, 5, 6];
+        let sum: u8 = vs.iter().sum();
+        vs.par_extend(vec![1, 2, 3, 4, 5, 6]);
+        assert_eq!(vs.iter().sum::<u8>(), sum * 2);
     }
 
     #[test]

@@ -8,34 +8,10 @@
 //!
 //! [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
 
-use std::fmt::{self, Debug, Display, Formatter, Pointer};
+use std::fmt::{self, Debug, Formatter, Pointer};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use std::{error::Error, marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull};
-use {Atomic, FillOnceAtomicOption, IntoPtr};
-
-/// Happens when you call `try_store` in a already filled [`AtomicOption`]/[`FillOnceAtomicOption`]/[`FillOnceAtomicArc`]
-///
-/// [`AtomicOption`]: ./struct.AtomicOption.html#method.try_store
-/// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html#method.try_store
-/// [`FillOnceAtomicArc`]: ./struct.FillOnceAtomicArc.html#method.try_store
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
-pub struct NotEmpty;
-
-impl Debug for NotEmpty {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "NotEmpty")
-    }
-}
-
-impl Display for NotEmpty {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "not empty")
-    }
-}
-
-impl Error for NotEmpty {}
+use std::{marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull};
+use {atomics::Atomic, atomics::FillOnceAtomicOption, IntoPtr, NotEmpty};
 
 /// Atomic `Option<Box<T>>`
 ///
@@ -59,7 +35,7 @@ impl<T> AtomicOption<T> {
     /// Creates new `AtomicOption`
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let empty: AtomicOption<()> = AtomicOption::new(None);
     /// assert!(empty.into_inner().is_none());
@@ -70,7 +46,7 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn new<V>(value: V) -> Self
     where
-        V: Into<Option<Box<T>>>
+        V: Into<Option<Box<T>>>,
     {
         Self::from(value.into())
     }
@@ -80,7 +56,7 @@ impl<T> AtomicOption<T> {
     /// This operation is implemented as a single atomic `compare_and_swap`.
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
@@ -94,7 +70,7 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn try_store<V>(&self, new: V, order: Ordering) -> Result<(), NotEmpty>
     where
-        V: Into<Box<T>>
+        V: Into<Box<T>>,
     {
         let ptr = new.into().into_ptr();
         let old = NonNull::new(self.0.compare_and_swap(null_mut(), ptr, order));
@@ -105,7 +81,7 @@ impl<T> AtomicOption<T> {
     /// Stores value into `AtomicOption` and drops old one
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option: AtomicOption<u8> = AtomicOption::new(None);
@@ -115,7 +91,7 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn store<V>(&self, new: V, order: Ordering)
     where
-        V: Into<Option<Box<T>>>
+        V: Into<Option<Box<T>>>,
     {
         drop(self.swap(new, order));
     }
@@ -123,7 +99,7 @@ impl<T> AtomicOption<T> {
     /// Stores value into `AtomicOption` returning old value
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
@@ -134,7 +110,7 @@ impl<T> AtomicOption<T> {
     #[inline]
     pub fn swap<V>(&self, new: V, order: Ordering) -> Option<Box<T>>
     where
-        V: Into<Option<Box<T>>>
+        V: Into<Option<Box<T>>>,
     {
         let ptr = new.into().into_ptr();
         let old = NonNull::new(self.0.swap(ptr, order));
@@ -145,7 +121,7 @@ impl<T> AtomicOption<T> {
     /// Replaces `AtomicOption` value with `None` returning old value
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::from(5);
@@ -167,7 +143,7 @@ impl<T> AtomicOption<T> {
     /// It's unsafe because you are responsible for making sure `T` is not dropped nor replaced with a invalid pointer (or that will be invalidated while still stored).
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let ten = AtomicOption::from(10);
@@ -182,7 +158,7 @@ impl<T> AtomicOption<T> {
     /// Converts itself into a `Option<Box<T>>`
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let ten = AtomicOption::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
@@ -201,7 +177,7 @@ impl<T> AtomicOption<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::ptr::null_mut;
     /// let empty = unsafe { AtomicOption::<()>::from_raw(null_mut()) };
@@ -227,7 +203,7 @@ impl<T> AtomicOption<T> {
     /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
     ///
     /// ```rust
-    /// # use voluntary_servitude::AtomicOption;
+    /// # use voluntary_servitude::atomics::AtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty: AtomicOption<()> = AtomicOption::new(None);

@@ -87,7 +87,9 @@ impl<T> Iter<T> {
     #[inline]
     pub fn last_node(&self) -> Option<&T> {
         trace!("last_node()");
-        self.inner.last_node().map(|nn| unsafe { (*nn.as_ptr()).value() })
+        self.inner
+            .last_node()
+            .map(|nn| unsafe { (*nn.as_ptr()).value() })
     }
 
     /// Returns current iterator size (may grow, but not decrease, be careful with race-conditions)
@@ -189,7 +191,9 @@ impl<'a, T> Iterator for &'a mut Iter<T> {
         };
 
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
-        debug_assert!(self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0);
+        debug_assert!(
+            self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0
+        );
         debug_assert!((self.index <= self.len() && data.is_some()) || self.index >= self.len());
         debug_assert!((self.index > self.len() && data.is_none()) || self.index <= self.len());
 
@@ -223,6 +227,7 @@ mod tests {
         setup_logger();
         let vs = vs![1, 2, 3];
         let mut iter = &mut vs.iter();
+        assert_eq!(iter.last_node(), Some(&3));
         assert_eq!(iter.index(), 0);
         assert_eq!(iter.len(), 3);
 
@@ -239,8 +244,10 @@ mod tests {
         assert_eq!(iter.index(), iter.len());
 
         vs.clear();
+        assert_eq!(vs.iter().last_node(), None);
         assert_eq!(vs.len(), 0);
         assert_eq!(iter.len(), 4);
+        assert_eq!(iter.last_node(), Some(&4));
         let iter = &mut vs.iter();
         assert_eq!(iter.len(), 0);
     }

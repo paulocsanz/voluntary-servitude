@@ -4,7 +4,7 @@
 
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::Ordering;
-use FillOnceAtomicOption;
+use {atomics::FillOnceAtomicOption, NotEmpty};
 
 /// One [`VoluntaryServitude`] element
 ///
@@ -41,11 +41,9 @@ impl<T> Node<T> {
 
     /// Inserts next as if there was None
     #[inline]
-    pub fn set_next(&self, node: Box<Self>) {
-        trace!("set_next({:p})", node);
-        #[allow(unused)]
-        let ret = self.next.try_store(node, Ordering::SeqCst);
-        debug_assert!(ret.is_ok());
+    pub fn try_store_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
+        trace!("try_store_next({:p})", node);
+        self.next.try_store(node, Ordering::SeqCst)
     }
 }
 

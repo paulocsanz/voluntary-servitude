@@ -10,12 +10,6 @@
 //! [dependencies]
 //! voluntary_servitude = { version = "4", features = "serde-traits" }
 //! ```
-//!
-//! For testing the feature `serde-tests` must be enabled
-//!
-//! ```bash
-//! cargo test --features "serde-traits serde-tests"
-//! ```
 
 use serde_lib::{de::SeqAccess, de::Visitor, ser::SerializeSeq};
 use serde_lib::{Deserialize, Deserializer, Serialize, Serializer};
@@ -23,7 +17,7 @@ use std::{fmt, fmt::Formatter, marker::PhantomData};
 use voluntary_servitude::{Inner, VoluntaryServitude};
 
 /// Abstracts deserializer visitor
-struct InnerVisitor<'a, T: 'a + Deserialize<'a>>(pub PhantomData<&'a T>);
+struct InnerVisitor<'a, T: Deserialize<'a>>(pub PhantomData<(&'a (), T)>);
 
 impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
     type Value = Inner<T>;
@@ -35,7 +29,7 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
 
     #[inline]
     fn visit_seq<A: SeqAccess<'a>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let inner = Inner::<T>::default();
+        let inner: Inner<T> = Inner::default();
         while let Some(value) = seq.next_element()? {
             inner.append(value);
         }
@@ -43,7 +37,7 @@ impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
     }
 }
 
-impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for Inner<T> {
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for Inner<T> {
     #[inline]
     fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
         debug!("Deserialize Inner");
@@ -66,7 +60,7 @@ impl<T: Serialize> Serialize for VoluntaryServitude<T> {
 }
 
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
-impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
     #[inline]
     fn deserialize<D: Deserializer<'a>>(des: D) -> Result<Self, D::Error> {
         Inner::deserialize(des).map(Self::from)
@@ -75,21 +69,24 @@ impl<'a, T: 'a + Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "serde-tests")]
     extern crate serde_json;
     use VS;
 
+    #[derive(Serialize, Deserialize)]
+    struct Derive<T>(pub VS<T>);
+
     #[test]
-    #[cfg(not(feature = "serde-tests"))]
-    fn improperly_testing_serde() {
-        #[cfg(not(feature = "serde-tests"))]
-        compile_error!(
-            "You must enable 'serde-tests', or disable 'serde-traits' to properly test the library"
+    fn derive_json() {
+        let string = serde_json::to_string(&Derive(vs![1u8, 2u8, 3u8, 4u8])).unwrap();
+        let vs: Derive<u8> = serde_json::from_str(&string).unwrap();
+        assert_eq!(
+            vs.0.iter().collect::<Vec<_>>(),
+            vec![&1u8, &2u8, &3u8, &4u8]
         );
     }
 
     #[test]
-    fn serde() {
+    fn json() {
         let string = serde_json::to_string(&vs![1u8, 2u8, 3u8, 4u8]).unwrap();
         let vs: VS<u8> = serde_json::from_str(&string).unwrap();
         assert_eq!(vs.iter().collect::<Vec<_>>(), vec![&1u8, &2u8, &3u8, &4u8]);

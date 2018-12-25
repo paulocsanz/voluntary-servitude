@@ -3,8 +3,8 @@
 use parking_lot::RwLock;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use std::{iter::Extend, iter::FromIterator, ptr::null_mut, ptr::NonNull, sync::Arc, mem::swap};
-use {node::Node, FillOnceAtomicOption, IntoPtr, Iter, NotEmpty};
+use std::{iter::Extend, iter::FromIterator, mem::swap, ptr::null_mut, ptr::NonNull, sync::Arc};
+use {atomics::FillOnceAtomicOption, node::Node, IntoPtr, Iter, NotEmpty};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -87,7 +87,9 @@ impl<T> Inner<T> {
     pub unsafe fn append_chain(&self, first: *mut Node<T>, last: *mut Node<T>, length: usize) {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         if let Some(nn) = self.swap_last(last) {
-            nn.as_ref().set_next(Box::from_raw(first))
+            #[allow(unused)]
+            let old = nn.as_ref().try_store_next(Box::from_raw(first));
+            debug_assert!(old.is_ok());
         } else {
             let _ = self.set_first(Box::from_raw(first));
         }
@@ -487,6 +489,16 @@ mod tests {
             vs.iter().collect::<Vec<_>>(),
             vec![&1u8, &2, &3, &4, &5, &1, &2, &3, &4, &5]
         );
+    }
+
+    #[test]
+    fn swap_empty() {
+        let vs: VS<u8> = vs![1, 2, 3, 4, 5];
+        let mut old: VS<u8> = vs![5, 4, 3, 2, 1];
+        vs.swap(&mut old);
+        assert_eq!(vs.empty().collect::<Vec<_>>(), vec![&5, &4, &3, &2, &1]);
+        assert_eq!(old.empty().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5]);
+        assert!(vs.is_empty());
     }
 
     #[test]

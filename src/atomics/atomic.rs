@@ -41,7 +41,7 @@ impl<T> Atomic<T> {
     /// Creates new `Atomic`
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let filled = Atomic::new(10);
     /// assert_eq!(*filled.into_inner(), 10);
@@ -49,7 +49,7 @@ impl<T> Atomic<T> {
     #[inline]
     pub fn new<V>(data: V) -> Self
     where
-        V: Into<Box<T>>
+        V: Into<Box<T>>,
     {
         Self::from(data.into())
     }
@@ -59,7 +59,7 @@ impl<T> Atomic<T> {
     /// [`Atomic`]: ./struct.Atomic.html
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let filled = Atomic::from(10);
@@ -69,7 +69,7 @@ impl<T> Atomic<T> {
     #[inline]
     pub fn store<V>(&self, new: V, order: Ordering)
     where
-        V: Into<Box<T>>
+        V: Into<Box<T>>,
     {
         drop(self.swap(new, order))
     }
@@ -77,7 +77,7 @@ impl<T> Atomic<T> {
     /// Stores value into `Atomic` returning old value
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option = Atomic::from(10);
@@ -87,7 +87,7 @@ impl<T> Atomic<T> {
     #[inline]
     pub fn swap<V>(&self, new: V, order: Ordering) -> Box<T>
     where
-        V: Into<Box<T>>
+        V: Into<Box<T>>,
     {
         unsafe { self.inner_swap(new.into().into_ptr(), order) }
     }
@@ -95,7 +95,7 @@ impl<T> Atomic<T> {
     /// Converts itself into a `Box<T>`
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let ten = Atomic::from(10);
     /// assert_eq!(*ten.into_inner(), 10);
@@ -114,7 +114,7 @@ impl<T> Atomic<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::ptr::null_mut;
     /// let empty: Option<Atomic<()>> = unsafe { Atomic::from_raw(null_mut()) };
@@ -137,7 +137,7 @@ impl<T> Atomic<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let filled = unsafe { Atomic::from_raw_unchecked(Box::into_raw(Box::new(10))) };
     /// assert_eq!(*filled.into_inner(), 10);
@@ -164,11 +164,9 @@ impl<T> Atomic<T> {
     /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
     ///
     /// ```rust
-    /// # use voluntary_servitude::Atomic;
+    /// # use voluntary_servitude::atomics::Atomic;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
-    /// let empty = unsafe { Atomic::<()>::from_raw_unchecked(null_mut()) };
-    /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
     ///
     /// let ptr = Box::into_raw(Box::new(10u8));
     /// let filled = unsafe { Atomic::from_raw(ptr) };

@@ -6,7 +6,7 @@
 
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ptr::NonNull, sync::atomic::Ordering};
-use {Atomic, AtomicOption, NotEmpty};
+use {atomics::Atomic, atomics::AtomicOption, NotEmpty};
 
 /// Atomic abstraction of a `Option<Box<T>>` that can provide access to a `Option<&T>`
 ///
@@ -19,7 +19,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// Creates new `FillOnceAtomicOption`
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -31,7 +31,7 @@ impl<T> FillOnceAtomicOption<T> {
     #[inline]
     pub fn new<V>(data: V) -> Self
     where
-        V: Into<Option<Box<T>>>
+        V: Into<Option<Box<T>>>,
     {
         Self::from(data.into())
     }
@@ -41,7 +41,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// This operation is implemented as a single atomic `compare_and_swap`.
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicOption::default();
@@ -56,7 +56,7 @@ impl<T> FillOnceAtomicOption<T> {
     #[inline]
     pub fn try_store<V>(&self, data: V, order: Ordering) -> Result<(), NotEmpty>
     where
-        V: Into<Box<T>>
+        V: Into<Box<T>>,
     {
         self.0.try_store(data, order)
     }
@@ -69,7 +69,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// [`AtomicOption`]: ./struct.AtomicOption.html
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let mut option = FillOnceAtomicOption::from(5);
@@ -88,7 +88,7 @@ impl<T: Copy> FillOnceAtomicOption<T> {
     /// Returns a copy of the wrapped `T`
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -107,7 +107,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// Atomically extracts a reference to the element stored
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -126,7 +126,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// Converts itself into a `Option<Box<T>>`
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// let ten = FillOnceAtomicOption::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
@@ -145,7 +145,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicOption::<()>::from_raw(null_mut()) };
@@ -170,7 +170,7 @@ impl<T> FillOnceAtomicOption<T> {
     /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized or dropped)
     ///
     /// ```rust
-    /// # use voluntary_servitude::FillOnceAtomicOption;
+    /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
     /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);

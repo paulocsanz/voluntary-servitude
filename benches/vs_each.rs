@@ -3,9 +3,9 @@ extern crate criterion;
 #[macro_use]
 extern crate voluntary_servitude;
 
+use criterion::Criterion;
 use std::iter::FromIterator;
 use voluntary_servitude::VS;
-use criterion::Criterion;
 
 fn new(c: &mut Criterion) {
     c.bench_function("new", move |b| b.iter(|| VS::<()>::new()));
@@ -51,7 +51,9 @@ fn extend(c: &mut Criterion) {
 
 fn from_iter(c: &mut Criterion) {
     let vs = vs![3, 2];
-    c.bench_function("from_iter", move |b| b.iter(|| VS::from_iter(vs.iter().cloned())));
+    c.bench_function("from_iter", move |b| {
+        b.iter(|| VS::from_iter(vs.iter().cloned()))
+    });
 }
 
 criterion_group!(methods, new, append, iter, len, is_empty, clear, empty, swap, extend, from_iter);
