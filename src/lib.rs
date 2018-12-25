@@ -68,6 +68,12 @@
 )]
 #![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.0/voluntary-servitude")]
 
+#[cfg(any(feature = "diesel-postgres", feature = "diesel-sqlite", feature = "diesel-mysql"))]
+extern crate diesel as diesel_lib;
+
+#[cfg(any(feature = "diesel-postgres", feature = "diesel-sqlite", feature = "diesel-mysql"))]
+extern crate byteorder;
+
 #[cfg(feature = "rayon-traits")]
 extern crate rayon as rayon_lib;
 
@@ -89,7 +95,7 @@ extern crate env_logger;
 /// **Cargo.toml**
 /// ```toml
 /// [dependencies]
-/// voluntary_servitude = { version = "3", features = "logs" }
+/// voluntary_servitude = { version = "4", features = "logs" }
 /// ```
 ///
 /// # Set the `RUST_LOG` env var:
@@ -145,6 +151,10 @@ mod rayon;
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "serde-traits")))]
 #[cfg(feature = "serde-traits")]
 mod serde;
+
+#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "diesel-traits")))]
+#[cfg(any(feature = "diesel-postgres", feature = "diesel-sqlite", feature = "diesel-mysql"))]
+mod diesel;
 
 pub use atomic::Atomic;
 pub use atomic_option::{AtomicOption, NotEmpty};

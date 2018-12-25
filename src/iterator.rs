@@ -30,7 +30,6 @@ use {node::Node, voluntary_servitude::Inner};
 /// ```
 ///
 /// [`VS`]: ./type.VS.html
-#[derive(Clone)]
 pub struct Iter<T> {
     /// References `Inner` extracted from `VS`
     inner: Arc<Inner<T>>,
@@ -38,6 +37,16 @@ pub struct Iter<T> {
     current: Option<NonNull<Node<T>>>,
     /// Iteration index
     index: usize,
+}
+
+impl<T> Clone for Iter<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            current: self.current.clone(),
+            index: self.index,
+        }
+    }
 }
 
 impl<T: Debug> Debug for Iter<T> {

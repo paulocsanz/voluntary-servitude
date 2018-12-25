@@ -8,7 +8,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! voluntary_servitude = { version = "3", features = "serde-traits" }
+//! voluntary_servitude = { version = "4", features = "serde-traits" }
 //! ```
 //!
 //! For testing the feature `serde-tests` must be enabled
