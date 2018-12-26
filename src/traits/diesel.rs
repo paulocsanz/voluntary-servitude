@@ -89,7 +89,7 @@ where
         let lower_bound = 1;
         out.write_i32::<NetworkEndian>(lower_bound)?;
 
-        let mut buffer = out.with_buffer(Vec::with_capacity(self.len()));
+        let mut buffer = out.with_buffer(Vec::new());
         for elem in &mut self.iter() {
             let is_null = elem.to_sql(&mut buffer)?;
             if let IsNull::No = is_null {
@@ -120,7 +120,7 @@ where
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "diesel-postgres")))]
 #[cfg_attr(docs_rs_workaround, doc(cfg(feature = "diesel-insertable")))]
 impl<T, Table> UndecoratedInsertRecord<Table> for VoluntaryServitude<T> where
-    [T]: UndecoratedInsertRecord<Table>
+    T: UndecoratedInsertRecord<Table>
 {}
 
 #[allow(missing_debug_implementations)]

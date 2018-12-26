@@ -17,9 +17,9 @@ use std::{fmt, fmt::Formatter, marker::PhantomData};
 use voluntary_servitude::{Inner, VoluntaryServitude};
 
 /// Abstracts deserializer visitor
-struct InnerVisitor<'a, T: Deserialize<'a>>(pub PhantomData<(&'a (), T)>);
+struct InnerVisitor<'a, 'b, T: 'b + Deserialize<'a>>(pub PhantomData<(&'a (), &'b T)>);
 
-impl<'a, T: Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, T> {
+impl<'a, 'b, T: 'b + Deserialize<'a>> Visitor<'a> for InnerVisitor<'a, 'b, T> {
     type Value = Inner<T>;
 
     #[inline]
