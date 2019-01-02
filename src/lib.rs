@@ -4,6 +4,7 @@
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
+//!  - [`Diesel Insertable implementation ("diesel-traits" feature)`]
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Logging ("logs" feature)`]
 //!
@@ -25,6 +26,37 @@
 //! # API of `VS` Iterator
 //! - [`Iter`]
 //!
+//! # Logging
+//!
+//! *Setup logger according to `RUST_LOG` env var and `logs` feature*
+//!
+//! ## Enable the feature:
+//!
+//! **Cargo.toml**
+//! ```toml
+//! [dependencies]
+//! voluntary_servitude = { version = "4", features = "logs" }
+//! ```
+//!
+//! ## Set the `RUST_LOG` env var:
+//!
+//! ```bash
+//! export RUST_LOG=voluntary_servitude=trace
+//! export RUST_LOG=voluntary_servitude=debug
+//! export RUST_LOG=voluntary_servitude=info
+//! export RUST_LOG=voluntary_servitude=warn
+//! export RUST_LOG=voluntary_servitude=error
+//! ```
+//!
+//! ## Enable the logger using some setup (like env_logger)
+//!
+//! ```rust
+//! extern crate env_logger;
+//! env_logger::init();
+//! // Call code to be logged
+//! // ...
+//! ```
+//!
 //! [`Atomic`]: ./atomics/struct.Atomic.html
 //! [`AtomicOption`]: ./atomics/struct.AtomicOption.html
 //! [`FillOnceAtomicOption`]: ./atomics/struct.FillOnceAtomicOption.html
@@ -32,11 +64,12 @@
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
+//! [`Diesel Insertable implementation ("diesel-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Insertable
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
-//! [`Logging ("logs" feature)`]: #functions
+//! [`Logging ("logs" feature)`]: #Logging
 
 #![deny(
     missing_docs,
@@ -70,71 +103,14 @@
 
 #![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 
-#[cfg(any(feature = "diesel-postgres", feature = "diesel-insertable"))]
-extern crate diesel as diesel_lib;
-
-#[cfg(feature = "diesel-postgres")]
-extern crate byteorder;
-
-#[cfg(feature = "rayon-traits")]
-extern crate rayon as rayon_lib;
-
-#[cfg(feature = "serde-traits")]
-extern crate serde as serde_lib;
-
-#[cfg(all(test, feature = "serde-traits"))]
-#[macro_use]
-extern crate serde_derive;
-
-extern crate parking_lot;
-
-#[macro_use]
-#[cfg(feature = "logs")]
-extern crate log;
-#[cfg(feature = "logs")]
-extern crate env_logger;
-
-/// Setup logger according to `RUST_LOG` env var
-///
-/// # Enable the feature:
-///
-/// **Cargo.toml**
-/// ```toml
-/// [dependencies]
-/// voluntary_servitude = { version = "4", features = "logs" }
-/// ```
-///
-/// # Set the `RUST_LOG` env var:
-/// ```bash
-/// export RUST_LOG=voluntary_servitude=trace
-/// export RUST_LOG=voluntary_servitude=debug
-/// export RUST_LOG=voluntary_servitude=info
-/// export RUST_LOG=voluntary_servitude=warn
-/// export RUST_LOG=voluntary_servitude=error
-/// ```
-///
-/// ```rust
-/// // Must enable the `logs` feature and set the appropriate `RUST_LOG` env var
-/// voluntary_servitude::setup_logger();
-/// // Call code to be logged
-/// // ...
-/// ```
-#[cfg(feature = "logs")]
-#[cfg_attr(docs_rs_workaround, doc(cfg(feature = "logs")))]
-#[inline]
-pub fn setup_logger() {
-    /// Ensures logger is only initialized once
-    static STARTED: std::sync::Once = std::sync::ONCE_INIT;
-    STARTED.call_once(env_logger::init);
-}
-
 /// Alias for [`voluntary_servitude`] macro
 ///
 /// [`voluntary_servitude`]: ./macro.voluntary_servitude.html
 ///
 /// ```
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// # extern crate env_logger;
+/// # env_logger::init();
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = vs![];
 /// assert!(vs.is_empty());
@@ -160,7 +136,8 @@ macro_rules! vs {
 ///
 /// ```
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// # extern crate env_logger;
+/// # env_logger::init();
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = voluntary_servitude![];
 /// assert!(vs.is_empty());
@@ -234,8 +211,8 @@ impl Display for NotEmpty {
 
 impl Error for NotEmpty {}
 
-pub use iterator::Iter;
-pub use voluntary_servitude::{VoluntaryServitude, VS};
+pub use crate::iterator::Iter;
+pub use crate::voluntary_servitude::{VoluntaryServitude, VS};
 
 use std::ptr::null_mut;
 
@@ -275,4 +252,16 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
     fn into_ptr(self) -> *mut T {
         self.map_or(null_mut(), Box::into_raw)
     }
+}
+
+#[cfg(all(feature = "logs", test))]
+extern crate env_logger;
+
+#[cfg(test)]
+pub fn setup_logger() {
+    use std::sync::Once;
+    #[allow(unused)]
+    static INITIALIZE: Once = Once::new();
+    #[cfg(feature = "logs")]
+    INITIALIZE.call_once(env_logger::init);
 }

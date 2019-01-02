@@ -5,7 +5,7 @@
 
 use std::fmt::{self, Debug, Formatter};
 use std::{iter::FusedIterator, ptr::NonNull, sync::Arc};
-use {node::Node, voluntary_servitude::Inner};
+use crate::{node::Node, voluntary_servitude::Inner};
 
 /// Lock-free iterator based on [`VS`]
 ///
@@ -13,7 +13,8 @@ use {node::Node, voluntary_servitude::Inner};
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// # extern crate env_logger;
+/// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// for number in &mut vs.iter() {
 ///     println!("Number: {}", number);
@@ -24,7 +25,8 @@ use {node::Node, voluntary_servitude::Inner};
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// # extern crate env_logger;
+/// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// let _ = vs.iter().map(|n| println!("Number: {}", n)).count();
 /// ```
@@ -75,11 +77,17 @@ impl<T> From<Arc<Inner<T>>> for Iter<T> {
 }
 
 impl<T> Iter<T> {
+    #[cfg(feature = "diesel-traits")]
+    pub(crate) fn inner(&self) -> Arc<Inner<T>> {
+        self.inner.clone()
+    }
+
     /// Returns reference to last element in list
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let vs = vs![2, 3, 4];
     /// let iter = vs.iter();
     /// assert_eq!(iter.last_node(), Some(&4));
@@ -98,7 +106,8 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let vs = vs![3];
     /// let iter = vs.iter();
     /// assert_eq!(iter.len(), 1);
@@ -127,7 +136,8 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let vs = vs![3];
     ///
     /// let mut iter = vs.iter();
@@ -156,7 +166,8 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let vs = vs![3, 4];
     /// let mut iter = &mut vs.iter();
     ///
@@ -215,12 +226,7 @@ impl<'a, T> FusedIterator for &'a mut Iter<T> {}
 
 #[cfg(test)]
 mod tests {
-    use voluntary_servitude::VS;
-
-    fn setup_logger() {
-        #[cfg(feature = "logs")]
-        ::setup_logger();
-    }
+    use crate::{setup_logger, voluntary_servitude::VS};
 
     #[test]
     fn iter_all() {

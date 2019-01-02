@@ -10,7 +10,8 @@ impl<T: Send + Sync> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![1, 2, 3];
     /// list.par_extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().sum::<i32>(), 21);
@@ -48,12 +49,8 @@ impl<T: Send + Sync> ParallelExtend<T> for VoluntaryServitude<T> {
 
 #[cfg(test)]
 mod tests {
+    use setup_logger;
     use super::*;
-
-    fn setup_logger() {
-        #[cfg(feature = "logs")]
-        ::setup_logger();
-    }
 
     #[test]
     fn par_extend() {

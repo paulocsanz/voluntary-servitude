@@ -11,7 +11,7 @@
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::{marker::PhantomData, mem::drop, ptr::null_mut, ptr::NonNull};
-use {atomics::Atomic, atomics::FillOnceAtomicOption, IntoPtr, NotEmpty};
+use crate::{atomics::Atomic, atomics::FillOnceAtomicOption, IntoPtr, NotEmpty};
 
 /// Atomic `Option<Box<T>>`
 ///
@@ -36,7 +36,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let empty: AtomicOption<()> = AtomicOption::new(None);
     /// assert!(empty.into_inner().is_none());
     ///
@@ -57,7 +58,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
     /// let old = option.try_store(5, Ordering::SeqCst);
@@ -82,7 +84,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option: AtomicOption<u8> = AtomicOption::new(None);
     /// option.store(Box::new(3), Ordering::SeqCst);
@@ -100,7 +103,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
     /// assert_eq!(option.swap(Box::new(5), Ordering::SeqCst), None);
@@ -122,7 +126,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::from(5);
     /// assert_eq!(option.take(Ordering::SeqCst), Some(Box::new(5)));
@@ -144,7 +149,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let ten = AtomicOption::from(10);
     /// assert_eq!(unsafe { &*ten.atomic_ptr().load(Ordering::SeqCst) }, &10);
@@ -159,7 +165,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let ten = AtomicOption::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
     /// ```
@@ -178,7 +185,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::ptr::null_mut;
     /// let empty = unsafe { AtomicOption::<()>::from_raw(null_mut()) };
     /// assert!(empty.into_inner().is_none());
@@ -204,7 +212,8 @@ impl<T> AtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::AtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty: AtomicOption<()> = AtomicOption::new(None);
     /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());

@@ -4,7 +4,7 @@
 
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::Ordering;
-use {atomics::FillOnceAtomicOption, NotEmpty};
+use crate::{atomics::FillOnceAtomicOption, NotEmpty};
 
 /// One [`VoluntaryServitude`] element
 ///

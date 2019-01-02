@@ -4,7 +4,7 @@ use parking_lot::RwLock;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::{iter::Extend, iter::FromIterator, mem::swap, ptr::null_mut, ptr::NonNull, sync::Arc};
-use {atomics::FillOnceAtomicOption, node::Node, IntoPtr, Iter, NotEmpty};
+use crate::{atomics::FillOnceAtomicOption, node::Node, IntoPtr, Iter, NotEmpty};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -143,7 +143,8 @@ impl<T> FromIterator<T> for Inner<T> {
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+/// # extern crate env_logger;
+/// # env_logger::init();
 /// let (a, b, c) = (0usize, 1usize, 2usize);
 /// // VS alias to VoluntaryServitude
 /// // vs! alias to voluntary_servitude! (and operates like vec!)
@@ -154,13 +155,13 @@ impl<T> FromIterator<T> for Inner<T> {
 /// // Be careful with race conditions since the value, when used, may not be true anymore
 /// assert_eq!(list.len(), 3);
 ///
-/// // The 'iter' method makes a one-time lock-free iterator (Iter)
+/// // The 'iter' method makes a lock-free iterator (Iter)
 /// for (index, element) in list.iter().enumerate() {
 ///     assert_eq!(index, *element);
 /// }
 ///
 /// // You can get the current iteration index
-/// // iter.next() == iter.len() means iteration ended (iter.next() == None)
+/// // iter.index() == iter.len() means iteration ended (iter.next() == None)
 /// let mut iter = &mut list.iter();
 /// assert_eq!(iter.index(), 0);
 /// assert_eq!(iter.next(), Some(&0));
@@ -228,12 +229,18 @@ pub struct VoluntaryServitude<T>(RwLock<Arc<Inner<T>>>);
 pub type VS<T> = VoluntaryServitude<T>;
 
 impl<T> VoluntaryServitude<T> {
+    #[cfg(feature = "diesel-traits")]
+    pub(crate) fn inner(&self) -> Arc<Inner<T>> {
+        self.0.read().clone()
+    }
+
     /// Creates new empty `VS` (like `Default` trait)
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # use voluntary_servitude::VS;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list: VS<()> = VS::new();
     /// assert!(list.is_empty());
     /// ```
@@ -247,7 +254,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![];
     /// let mut iter = list.iter();
     ///
@@ -269,7 +277,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
     ///
@@ -287,7 +296,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.len(), 2);
     /// list.append(5);
@@ -304,7 +314,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![];
     /// assert!(list.is_empty());
     /// list.append(());
@@ -319,7 +330,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.iter();
     /// list.clear();
@@ -337,7 +349,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.empty();
     /// assert_eq!(iter.len(), 2);
@@ -356,7 +369,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let list2 = vs![5, 4];
     /// list.swap(&list2);
@@ -373,7 +387,8 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let list = vs![1, 2, 3];
     /// list.extend(vec![4, 5, 6]);
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&1, &2, &3, &4, &5, &6]);
@@ -451,11 +466,7 @@ impl<T> From<Inner<T>> for VoluntaryServitude<T> {
 mod tests {
     use super::*;
     use std::mem::drop;
-
-    fn setup_logger() {
-        #[cfg(feature = "logs")]
-        ::setup_logger();
-    }
+    use crate::setup_logger;
 
     #[test]
     fn iter_outlives() {

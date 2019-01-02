@@ -6,7 +6,7 @@
 
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ptr::NonNull, sync::atomic::Ordering};
-use {atomics::Atomic, atomics::AtomicOption, NotEmpty};
+use crate::{atomics::Atomic, atomics::AtomicOption, NotEmpty};
 
 /// Atomic abstraction of a `Option<Box<T>>` that can provide access to a `Option<&T>`
 ///
@@ -20,7 +20,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
@@ -42,7 +43,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicOption::default();
     /// let old = option.try_store(5, Ordering::SeqCst);
@@ -70,7 +72,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let mut option = FillOnceAtomicOption::from(5);
     /// assert_eq!(option.take(Ordering::SeqCst), Some(Box::new(5)));
@@ -89,7 +92,8 @@ impl<T: Copy> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.load(Ordering::SeqCst), None);
@@ -108,7 +112,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
@@ -127,7 +132,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// let ten = FillOnceAtomicOption::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
     /// ```
@@ -146,7 +152,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicOption::<()>::from_raw(null_mut()) };
     /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
@@ -171,7 +178,8 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # #[cfg(feature = "logs")] voluntary_servitude::setup_logger();
+    /// # extern crate env_logger;
+    /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
     /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());

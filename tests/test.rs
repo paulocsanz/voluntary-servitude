@@ -1,12 +1,17 @@
 #[macro_use]
 extern crate voluntary_servitude;
+#[cfg(feature = "logs")]
+extern crate env_logger;
 
 use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, Arc};
 use std::{cmp::max, thread::spawn};
 
 fn setup_logger() {
+    use std::sync::Once;
+    #[allow(unused)]
+    static INITIALIZE: Once = Once::new();
     #[cfg(feature = "logs")]
-    voluntary_servitude::setup_logger();
+    INITIALIZE.call_once(env_logger::init);
 }
 
 #[test]

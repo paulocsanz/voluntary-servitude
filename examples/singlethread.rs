@@ -12,13 +12,13 @@ fn main() {
     // Be careful with race conditions since the value, when used, may not be true anymore
     assert_eq!(list.len(), 3);
 
-    // The 'iter' method makes a one-time lock-free iterator (Iter)
+    // The 'iter' method makes a lock-free iterator (Iter)
     for (index, element) in list.iter().enumerate() {
         assert_eq!(index, *element);
     }
 
     // You can get the current iteration index
-    // iter.next() == iter.len() means iteration ended (iter.next() == None)
+    // iter.index() == iter.len() means iteration ended (iter.next() == None)
     let mut iter = &mut list.iter();
     assert_eq!(iter.index(), 0);
     assert_eq!(iter.next(), Some(&0));
