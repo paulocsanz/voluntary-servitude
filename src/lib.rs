@@ -108,7 +108,7 @@
     unused_parens,
     while_true
 )]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.2/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.3/voluntary-servitude")]
 #![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 
 /// Alias for [`voluntary_servitude`] macro
