@@ -11,10 +11,10 @@
 //! voluntary_servitude = { version = "4", features = "serde-traits" }
 //! ```
 
-use serde_lib::{de::SeqAccess, de::Visitor, ser::SerializeSeq};
-use serde_lib::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::{prelude::*, voluntary_servitude::Inner};
+use serde::{de::SeqAccess, de::Visitor, ser::SerializeSeq};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, fmt::Formatter, marker::PhantomData};
-use voluntary_servitude::{Inner, VoluntaryServitude};
 
 /// Abstracts deserializer visitor
 struct InnerVisitor<'a, 'b, T: 'b + Deserialize<'a>>(pub PhantomData<(&'a (), &'b T)>);
@@ -69,8 +69,8 @@ impl<'a, T: Deserialize<'a>> Deserialize<'a> for VoluntaryServitude<T> {
 
 #[cfg(test)]
 mod tests {
-    extern crate serde_json;
-    use VS;
+    use crate::VS;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     struct Derive<T>(pub VS<T>);

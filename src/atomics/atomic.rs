@@ -8,10 +8,10 @@
 //!
 //! [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
 
+use crate::prelude::*;
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::ptr::{null_mut, NonNull};
 use std::{marker::PhantomData, mem::drop, sync::atomic::AtomicPtr, sync::atomic::Ordering};
-use crate::IntoPtr;
 
 /// Atomic `Box<T>`
 ///
@@ -41,9 +41,7 @@ impl<T> Atomic<T> {
     /// Creates new `Atomic`
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let filled = Atomic::new(10);
     /// assert_eq!(*filled.into_inner(), 10);
@@ -61,9 +59,7 @@ impl<T> Atomic<T> {
     /// [`Atomic`]: ./struct.Atomic.html
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let filled = Atomic::from(10);
@@ -81,9 +77,7 @@ impl<T> Atomic<T> {
     /// Stores value into `Atomic` returning old value
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = Atomic::from(10);
@@ -101,9 +95,7 @@ impl<T> Atomic<T> {
     /// Converts itself into a `Box<T>`
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let ten = Atomic::from(10);
     /// assert_eq!(*ten.into_inner(), 10);
@@ -122,9 +114,7 @@ impl<T> Atomic<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::ptr::null_mut;
     /// let empty: Option<Atomic<()>> = unsafe { Atomic::from_raw(null_mut()) };
@@ -147,9 +137,7 @@ impl<T> Atomic<T> {
     /// You must own the pointer to call this
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let filled = unsafe { Atomic::from_raw_unchecked(Box::into_raw(Box::new(10))) };
     /// assert_eq!(*filled.into_inner(), 10);
@@ -176,9 +164,7 @@ impl<T> Atomic<T> {
     /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
     ///
     /// ```rust
-    /// # extern voluntary_servitude;
     /// # use voluntary_servitude::atomics::Atomic;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     ///

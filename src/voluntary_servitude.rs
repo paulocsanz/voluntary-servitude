@@ -1,10 +1,10 @@
 //! Thread-safe appendable list that can create a lock-free iterator
 
+use crate::{node::Node, prelude::*};
 use parking_lot::RwLock;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use std::{iter::Extend, iter::FromIterator, mem::swap, ptr::null_mut, ptr::NonNull, sync::Arc};
-use crate::{atomics::FillOnceAtomicOption, node::Node, IntoPtr, Iter, NotEmpty};
 
 /// Holds actual [`VoluntaryServitude`]'s data, abstracts safety
 ///
@@ -143,7 +143,6 @@ impl<T> FromIterator<T> for Inner<T> {
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
 /// # env_logger::init();
 /// let (a, b, c) = (0usize, 1usize, 2usize);
 /// // VS alias to VoluntaryServitude
@@ -181,8 +180,7 @@ impl<T> FromIterator<T> for Inner<T> {
 /// # Multi-producer, multi-consumer
 ///
 /// ```rust
-/// #[macro_use]
-/// extern crate voluntary_servitude;
+/// # #[macro_use] extern crate voluntary_servitude;
 /// use std::{sync::Arc, thread::spawn};
 ///
 /// const CONSUMERS: usize = 8;
@@ -229,7 +227,9 @@ pub struct VoluntaryServitude<T>(RwLock<Arc<Inner<T>>>);
 pub type VS<T> = VoluntaryServitude<T>;
 
 impl<T> VoluntaryServitude<T> {
+    /// Exposes internal `Inner` to simplify implementations of other types based on it (like for `diesel` support)
     #[cfg(feature = "diesel-traits")]
+    #[inline]
     pub(crate) fn inner(&self) -> Arc<Inner<T>> {
         self.0.read().clone()
     }
@@ -239,7 +239,6 @@ impl<T> VoluntaryServitude<T> {
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # use voluntary_servitude::VS;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list: VS<()> = VS::new();
     /// assert!(list.is_empty());
@@ -254,7 +253,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![];
     /// let mut iter = list.iter();
@@ -277,7 +275,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
@@ -296,7 +293,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.len(), 2);
@@ -314,7 +310,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![];
     /// assert!(list.is_empty());
@@ -330,7 +325,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.iter();
@@ -349,7 +343,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.empty();
@@ -369,7 +362,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let list2 = vs![5, 4];
@@ -387,7 +379,6 @@ impl<T> VoluntaryServitude<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let list = vs![1, 2, 3];
     /// list.extend(vec![4, 5, 6]);
@@ -465,8 +456,8 @@ impl<T> From<Inner<T>> for VoluntaryServitude<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::mem::drop;
     use crate::setup_logger;
+    use std::mem::drop;
 
     #[test]
     fn iter_outlives() {

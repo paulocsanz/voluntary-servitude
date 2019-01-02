@@ -2,9 +2,9 @@
 //!
 //! Since `FillOnceAtomicArc` can only be filled once it's safe to provide access to the inner `Option<Arc<T>>` and `Option<&T>`
 
+use crate::prelude::*;
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{sync::atomic::Ordering, sync::Arc};
-use crate::{atomics::FillOnceAtomicOption, NotEmpty};
 
 /// Atomic abstraction of a `Option<Arc<T>>` that can provide access to a cloned `Option<Arc<T>>` and a `Option<&T>`
 pub struct FillOnceAtomicArc<T>(FillOnceAtomicOption<Arc<T>>);
@@ -14,7 +14,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::{Arc, atomic::Ordering};
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
@@ -38,7 +37,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicArc::default();
@@ -62,7 +60,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
@@ -80,7 +77,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
@@ -98,7 +94,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let ten = FillOnceAtomicArc::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
@@ -118,7 +113,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::{sync::Arc, sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicArc::<()>::from_raw(null_mut()) };
@@ -146,7 +140,6 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicArc;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);

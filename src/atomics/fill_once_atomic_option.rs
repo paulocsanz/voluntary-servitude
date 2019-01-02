@@ -4,15 +4,15 @@
 //!
 //! This is ideal for a iterator or some consumer that doesn't actually consume the data
 
+use crate::prelude::*;
 use std::fmt::{self, Debug, Formatter, Pointer};
 use std::{ptr::NonNull, sync::atomic::Ordering};
-use crate::{atomics::Atomic, atomics::AtomicOption, NotEmpty};
 
 /// Atomic abstraction of a `Option<Box<T>>` that can provide access to a `Option<&T>`
 ///
 /// This is ideal for a iterator or some consumer that doesn't actually consume the data
 ///
-/// To make that possible the API is heavily limited (can only write to it through `try_store`
+/// To make that possible the API is heavily limited (can only write to it through `try_store`)
 pub struct FillOnceAtomicOption<T>(AtomicOption<T>);
 
 impl<T> FillOnceAtomicOption<T> {
@@ -20,7 +20,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -43,7 +42,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicOption::default();
@@ -65,14 +63,12 @@ impl<T> FillOnceAtomicOption<T> {
 
     /// Replaces `FillOnceAtomicOption` value with `None` returning old value
     ///
-    /// As opposed to [`take`] from [`AtomicOption`]
+    /// As opposed to `take` from [`AtomicOption`]
     ///
-    /// [`take`]: ./struct.AtomicOption.html#method.take
-    /// [`AtomicOption`]: ./struct.AtomicOption.html
+    /// [`AtomicOption`]: ./struct.AtomicOption.html#method.take
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let mut option = FillOnceAtomicOption::from(5);
@@ -92,7 +88,6 @@ impl<T: Copy> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -112,7 +107,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
@@ -132,7 +126,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let ten = FillOnceAtomicOption::from(10);
     /// assert_eq!(ten.into_inner().map(|a| *a), Some(10));
@@ -152,7 +145,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicOption::<()>::from_raw(null_mut()) };
@@ -178,7 +170,6 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);

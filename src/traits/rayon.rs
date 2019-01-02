@@ -1,7 +1,7 @@
 //! Integration with rayon
 
-use rayon_lib::prelude::*;
-use {VoluntaryServitude, VS};
+use crate::prelude::*;
+use rayon::prelude::*;
 
 impl<T: Send + Sync> VoluntaryServitude<T> {
     /// Parallely Extends [`VS`] like the `ParallelExtend` trait, but without a mutable reference
@@ -49,8 +49,8 @@ impl<T: Send + Sync> ParallelExtend<T> for VoluntaryServitude<T> {
 
 #[cfg(test)]
 mod tests {
-    use setup_logger;
     use super::*;
+    use crate::setup_logger;
 
     #[test]
     fn par_extend() {

@@ -3,9 +3,11 @@
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 
+#[cfg(feature = "logs")]
+use crate::prelude::*;
+use crate::{node::Node, voluntary_servitude::Inner};
 use std::fmt::{self, Debug, Formatter};
 use std::{iter::FusedIterator, ptr::NonNull, sync::Arc};
-use crate::{node::Node, voluntary_servitude::Inner};
 
 /// Lock-free iterator based on [`VS`]
 ///
@@ -13,7 +15,6 @@ use crate::{node::Node, voluntary_servitude::Inner};
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
 /// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// for number in &mut vs.iter() {
@@ -25,7 +26,6 @@ use crate::{node::Node, voluntary_servitude::Inner};
 ///
 /// ```rust
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
 /// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// let _ = vs.iter().map(|n| println!("Number: {}", n)).count();
@@ -42,10 +42,11 @@ pub struct Iter<T> {
 }
 
 impl<T> Clone for Iter<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
-            current: self.current.clone(),
+            inner: Arc::clone(&self.inner),
+            current: self.current,
             index: self.index,
         }
     }
@@ -59,7 +60,8 @@ impl<T: Debug> Debug for Iter<T> {
             .field(
                 "current",
                 &self.current.map(|ptr| unsafe { &*ptr.as_ptr() }),
-            ).field("index", &self.index)
+            )
+            .field("index", &self.index)
             .finish()
     }
 }
@@ -77,16 +79,17 @@ impl<T> From<Arc<Inner<T>>> for Iter<T> {
 }
 
 impl<T> Iter<T> {
+    /// Exposes internal `Inner` to simplify implementations of other types based on it (like for `diesel` support)
     #[cfg(feature = "diesel-traits")]
+    #[inline]
     pub(crate) fn inner(&self) -> Arc<Inner<T>> {
-        self.inner.clone()
+        Arc::clone(&self.inner)
     }
 
     /// Returns reference to last element in list
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let vs = vs![2, 3, 4];
     /// let iter = vs.iter();
@@ -106,7 +109,6 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let vs = vs![3];
     /// let iter = vs.iter();
@@ -136,7 +138,6 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let vs = vs![3];
     ///
@@ -166,7 +167,6 @@ impl<T> Iter<T> {
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
     /// # env_logger::init();
     /// let vs = vs![3, 4];
     /// let mut iter = &mut vs.iter();
@@ -203,7 +203,7 @@ impl<'a, T> Iterator for &'a mut Iter<T> {
 
         debug!("{} at {} of {}", data.is_some(), self.index, self.len());
         debug_assert!(
-            self.len() == 0 && self.index == 0 && data.is_none() || self.inner.len() != 0
+            self.is_empty() && self.index == 0 && data.is_none() || self.inner.len() != 0
         );
         debug_assert!((self.index <= self.len() && data.is_some()) || self.index >= self.len());
         debug_assert!((self.index > self.len() && data.is_none()) || self.index <= self.len());
@@ -246,7 +246,8 @@ mod tests {
             .map(|n| {
                 assert_eq!(iter.next(), Some(&n));
                 assert_eq!(iter.index(), n);
-            }).count();
+            })
+            .count();
         assert_eq!(iter.index(), iter.len());
 
         vs.clear();

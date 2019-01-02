@@ -4,9 +4,16 @@
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
-//!  - [`Diesel Insertable implementation ("diesel-traits" feature)`]
+//!  - [`Diesel Insertable implementation ("diesel-traits" or "diesel-sqlite" feature)`]
+//!
+//!    Implements `Insertable` for [`&VS`] and [`&Iter`]
+//!
+//!    Sqlite backend is not supported since it doesn't really support batch inserts and we can't
+//!    implement the traits needed to mock it (orphan rules), use a transaction and insert them individually ([https://github.com/diesel-rs/diesel/issues/1177](https://github.com/diesel-rs/diesel/issues/1177))
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Logging ("logs" feature)`]
+//!
+//!     You probably only need this if you are debugging this crate
 //!
 //! # Atomic abstractions
 //!  - [`Atomic`] -> atomic `Box<T>`
@@ -64,12 +71,14 @@
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
-//! [`Diesel Insertable implementation ("diesel-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Insertable
-//! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-1
+//! [`Diesel Insertable implementation ("diesel-traits" or "diesel-sqlite" feature)`]: ./struct.VoluntaryServitude.html#impl-Insertable<Tab>
+//! [`&VS`]: ./struct.VoluntaryServitude.html#impl-Insertable<Tab>
+//! [`&Iter`]: ./struct.Iter.html#impl-Insertable<Tab>
+//! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-FromParallelIterator<T>
 //! [`VoluntaryServitude`]: ./struct.VoluntaryServitude.html
 //! [`VS`]: ./type.VS.html
 //! [`Iter`]: ./struct.Iter.html
-//! [`Logging ("logs" feature)`]: #Logging
+//! [`Logging ("logs" feature)`]: #logging
 
 #![deny(
     missing_docs,
@@ -100,7 +109,6 @@
     while_true
 )]
 #![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.2/voluntary-servitude")]
-
 #![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 
 /// Alias for [`voluntary_servitude`] macro
@@ -167,6 +175,11 @@ macro_rules! voluntary_servitude {
     }};
 }
 
+// Diesel doesn't play well with 2018 edition macro imports
+#[cfg(all(any(feature = "diesel-traits", feature = "diesel-sqlite"), test))]
+#[macro_use]
+extern crate diesel;
+
 /// Remove logging macros when they are disabled (at compile time)
 #[macro_use]
 #[cfg(not(feature = "logs"))]
@@ -184,6 +197,16 @@ mod iterator;
 mod node;
 mod traits;
 mod voluntary_servitude;
+
+/// Simplify internal imports
+#[allow(unused)]
+mod prelude {
+    pub(crate) use crate::atomics::{Atomic, AtomicOption, FillOnceAtomicOption};
+    pub(crate) use crate::{IntoPtr, NotEmpty};
+    pub(crate) use crate::{Iter, VoluntaryServitude, VS};
+    #[cfg(feature = "logs")]
+    pub use log::{debug, error, info, trace, warn};
+}
 
 use std::{error::Error, fmt, fmt::Debug, fmt::Display, fmt::Formatter};
 
