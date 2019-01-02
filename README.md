@@ -15,6 +15,8 @@
  - `par_extend`, `from_par_iter` rayon implementation (`rayon-traits` feature)
  - Logging (`logs` feature)
 
+    You probably only need this if you are debugging this crate
+
 # Atomic abstractions
  - **Atomic** -> atomic `Box<T>`
  - **AtomicOption** -> atomic `Option<Box<T>>`
@@ -23,7 +25,7 @@
 
 With `Atomic` and `AtomicOption` it's not safe to get a reference, you must replace the value to access it.
 
-To safely get a reference to T you must use `FillOnceAtomicOption` and accept the API limitations (initially `None` but can be filled once).
+To safely get a reference of T you must use `FillOnceAtomicOption` and accept the API limitations (initially `None` but can be filled once).
 
 For a safe `AtomicArc` you must use some data-structure from `arc-swap`, `RwLock/Mutex` from `parking_lot` (or `std`, which is slower but the standard) or `FillOnceAtomicArc` and accept the limited API (2018).
 

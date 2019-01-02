@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate voluntary_servitude;
+#[macro_use] extern crate voluntary_servitude;
 
 fn main() {
     let (a, b, c) = (0usize, 1usize, 2usize);

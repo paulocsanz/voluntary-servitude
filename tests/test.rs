@@ -1,8 +1,4 @@
-#[macro_use]
-extern crate voluntary_servitude;
-#[cfg(feature = "logs")]
-extern crate env_logger;
-
+use voluntary_servitude::voluntary_servitude;
 use std::sync::{atomic::AtomicBool, atomic::AtomicUsize, atomic::Ordering, Arc};
 use std::{cmp::max, thread::spawn};
 

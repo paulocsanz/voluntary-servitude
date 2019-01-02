@@ -135,7 +135,7 @@ impl<T> FillOnceAtomicArc<T> {
     ///
     /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicArc` wasn't dropped
     ///
-    /// Returns `null` if `FillOnceAtomicArc` is empty (was not initialized or dropped)
+    /// Returns `null` if `FillOnceAtomicArc` is empty (was not initialized)
     ///
     ///
     /// ```rust

@@ -23,7 +23,7 @@
 //!
 //! With [`Atomic`] and [`AtomicOption`] it's not safe to get a reference, you must replace the value to access it.
 //!
-//! To safely get a reference to T you must use [`FillOnceAtomicOption`] and accept the API limitations (initially `None` but can be filled once).
+//! To safely get a reference of T you must use [`FillOnceAtomicOption`] and accept the API limitations (initially `None` but can be filled once).
 //!
 //! For a safe `AtomicArc` you must use some data-structure from `arc-swap`, `RwLock/Mutex` from `parking_lot` (or `std`, which is slower but the standard) or [`FillOnceAtomicArc`] and accept the limited API (2018).
 //!
@@ -58,7 +58,6 @@
 //! ## Enable the logger using some setup (like env_logger)
 //!
 //! ```rust
-//! extern crate env_logger;
 //! env_logger::init();
 //! // Call code to be logged
 //! // ...
@@ -117,7 +116,6 @@
 ///
 /// ```
 /// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
 /// # env_logger::init();
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = vs![];
@@ -143,9 +141,8 @@ macro_rules! vs {
 /// [`VS`]: ./type.VS.html
 ///
 /// ```
-/// # #[macro_use] extern crate voluntary_servitude;
-/// # extern crate env_logger;
 /// # env_logger::init();
+/// # #[macro_use] extern crate voluntary_servitude;
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = voluntary_servitude![];
 /// assert!(vs.is_empty());
@@ -276,9 +273,6 @@ impl<T> IntoPtr<T> for Option<Box<T>> {
         self.map_or(null_mut(), Box::into_raw)
     }
 }
-
-#[cfg(all(feature = "logs", test))]
-extern crate env_logger;
 
 #[cfg(test)]
 pub fn setup_logger() {

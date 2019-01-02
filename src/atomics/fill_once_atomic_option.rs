@@ -166,7 +166,7 @@ impl<T> FillOnceAtomicOption<T> {
     ///
     /// To deref it you must ensure that it's not `null`, the `FillOnceAtomicOption` wasn't dropped
     ///
-    /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized or dropped)
+    /// Returns `null` if `FillOnceAtomicOption` is empty (was not initialized)
     ///
     /// ```rust
     /// # use voluntary_servitude::atomics::FillOnceAtomicOption;

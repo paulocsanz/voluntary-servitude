@@ -1,5 +1,3 @@
 /target
 **/*.rs.bk
 Cargo.lock
-examples/ffi
-examples/multithread

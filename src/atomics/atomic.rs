@@ -174,7 +174,7 @@ impl<T> Atomic<T> {
     ///
     /// // You should probably never deref `ptr`
     /// // You should probably never use this method
-    /// // UB will be everywhere, FillOnceAtomicOption is a safe an alternative
+    /// // UB will be everywhere, FillOnceAtomicOption is a safe alternative
     /// ```
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut T {
