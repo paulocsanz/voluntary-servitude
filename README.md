@@ -1,17 +1,11 @@
 # Voluntary Servitude
 
-* [Documentation](https://docs.rs/voluntary-servitude/4.0.3/voluntary-servitude)
+* [Documentation](https://docs.rs/voluntary-servitude/4.0.4/voluntary-servitude)
 
 # Features
  - Atomic abstractions (`Atomic`, `AtomicOption`, `FillOnceAtomicOption`, `FillOnceAtomicArc`)
  - Thread-safe appendable list with a lock-free iterator (`VoluntaryServitude` - also called `VS`)
  - Serde serialization (`serde-traits` feature)
- - Diesel Insertable implementation (`diesel-traits` or `diesel-sqlite` feature)
-
-    Implements `Insertable` for `&VS` and `&Iter`
-
-    Sqlite backend is not supported since it doesn't really support batch inserts and we can't
-    implement the traits needed to mock it (orphan rules), use a transaction and insert them individually ([https://github.com/diesel-rs/diesel/issues/1177](https://github.com/diesel-rs/diesel/issues/1177))
  - `par_extend`, `from_par_iter` rayon implementation (`rayon-traits` feature)
  - Logging (`logs` feature)
 

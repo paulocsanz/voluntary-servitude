@@ -227,13 +227,6 @@ pub struct VoluntaryServitude<T>(RwLock<Arc<Inner<T>>>);
 pub type VS<T> = VoluntaryServitude<T>;
 
 impl<T> VoluntaryServitude<T> {
-    /// Exposes internal `Inner` to simplify implementations of other types based on it (like for `diesel` support)
-    #[cfg(feature = "diesel-traits")]
-    #[inline]
-    pub(crate) fn inner(&self) -> Arc<Inner<T>> {
-        self.0.read().clone()
-    }
-
     /// Creates new empty `VS` (like `Default` trait)
     ///
     /// ```rust

@@ -4,12 +4,6 @@
 //!  - [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]
 //!  - [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]
 //!  - [`Serde serialization/deserialization ("serde-traits" feature)`]
-//!  - [`Diesel Insertable implementation ("diesel-traits" or "diesel-sqlite" feature)`]
-//!
-//!    Implements `Insertable` for [`&VS`] and [`&Iter`]
-//!
-//!    Sqlite backend is not supported since it doesn't really support batch inserts and we can't
-//!    implement the traits needed to mock it (orphan rules), use a transaction and insert them individually ([https://github.com/diesel-rs/diesel/issues/1177](https://github.com/diesel-rs/diesel/issues/1177))
 //!  - [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]
 //!  - [`Logging ("logs" feature)`]
 //!
@@ -70,7 +64,6 @@
 //! [`Atomic abstractions (Atomic, AtomicOption, FillOnceAtomicOption, FillOnceAtomicArc)`]: #atomic-abstractions
 //! [`Thread-safe appendable list with a lock-free iterator (VoluntaryServitude - also called VS)`]: ./struct.VoluntaryServitude.html
 //! [`Serde serialization/deserialization ("serde-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-Serialize
-//! [`Diesel Insertable implementation ("diesel-traits" or "diesel-sqlite" feature)`]: ./struct.VoluntaryServitude.html#impl-Insertable<Tab>
 //! [`&VS`]: ./struct.VoluntaryServitude.html#impl-Insertable<Tab>
 //! [`&Iter`]: ./struct.Iter.html#impl-Insertable<Tab>
 //! [`par_extend, from_par_iter rayon implementation ("rayon-traits" feature)`]: ./struct.VoluntaryServitude.html#impl-FromParallelIterator<T>
@@ -107,7 +100,7 @@
     unused_parens,
     while_true
 )]
-#![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.3/voluntary-servitude")]
+#![doc(html_root_url = "https://docs.rs/voluntary_servitude/4.0.4/voluntary-servitude")]
 #![cfg_attr(docs_rs_workaround, feature(doc_cfg))]
 
 /// Alias for [`voluntary_servitude`] macro
@@ -171,11 +164,6 @@ macro_rules! voluntary_servitude {
         vs
     }};
 }
-
-// Diesel doesn't play well with 2018 edition macro imports
-#[cfg(all(any(feature = "diesel-traits", feature = "diesel-sqlite"), test))]
-#[macro_use]
-extern crate diesel;
 
 /// Remove logging macros when they are disabled (at compile time)
 #[macro_use]

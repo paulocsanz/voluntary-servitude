@@ -5,6 +5,3 @@ mod rayon;
 
 #[cfg(feature = "serde-traits")]
 mod serde;
-
-#[cfg(feature = "diesel-traits")]
-mod diesel;

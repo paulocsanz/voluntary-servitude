@@ -79,13 +79,6 @@ impl<T> From<Arc<Inner<T>>> for Iter<T> {
 }
 
 impl<T> Iter<T> {
-    /// Exposes internal `Inner` to simplify implementations of other types based on it (like for `diesel` support)
-    #[cfg(feature = "diesel-traits")]
-    #[inline]
-    pub(crate) fn inner(&self) -> Arc<Inner<T>> {
-        Arc::clone(&self.inner)
-    }
-
     /// Returns reference to last element in list
     ///
     /// ```rust
