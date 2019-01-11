@@ -22,7 +22,7 @@ use std::{marker::PhantomData, mem::drop, sync::atomic::AtomicPtr, sync::atomic:
 /// [`FillOnceAtomicOption`] provides a API that enables access to the reference, but only enables `try_store` to write to it
 ///
 /// [`FillOnceAtomicOption`]: ./struct.FillOnceAtomicOption.html
-pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Box<T>>);
+pub struct Atomic<T>(AtomicPtr<T>, PhantomData<Option<Box<T>>>);
 
 impl<T: Debug> Debug for Atomic<T> {
     #[inline]
