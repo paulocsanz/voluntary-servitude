@@ -115,6 +115,8 @@ impl<T> AtomicOption<T> {
         let ptr = new.into().into_ptr();
         let old = NonNull::new(self.0.swap(ptr, order));
         trace!("swap({:p}) = {:?}", ptr, old);
+        // Since we are transfering the ownership of the object pointed by the `AtomicPtr`
+        // We can `Box` it to make it safe to access by the new owner
         old.map(|nn| unsafe { Box::from_raw(nn.as_ptr()) })
     }
 

@@ -116,9 +116,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
-    pub fn get_ref(&self, order: Ordering) -> Option<&T> {
+    pub fn get_ref<'a>(&'a self, order: Ordering) -> Option<&'a T> {
         let raw = self.0.get_raw(order);
         debug!("FillOnceAtomicOption get_ref: {:p}", raw);
+        // This specific API ensures that the pointer is either `null`or won't ever change, so we can get a ref to it (with the same lifetime as `Self`)
         NonNull::new(raw).map(|nn| unsafe { &*nn.as_ptr() })
     }
 

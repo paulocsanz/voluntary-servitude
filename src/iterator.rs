@@ -55,12 +55,11 @@ impl<T> Clone for Iter<T> {
 impl<T: Debug> Debug for Iter<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // We can deref its pointer because `inner` owns it and we own `inner`
+        let curr = self.current.as_ref().map(|ptr| unsafe { ptr.as_ref() });
         f.debug_struct("Iter")
             .field("inner", &self.inner)
-            .field(
-                "current",
-                &self.current.map(|ptr| unsafe { &*ptr.as_ptr() }),
-            )
+            .field("current", &curr)
             .field("index", &self.index)
             .finish()
     }
@@ -89,8 +88,11 @@ impl<T> Iter<T> {
     /// assert_eq!(iter.last_node(), Some(&4));
     /// ```
     #[inline]
-    pub fn last_node(&self) -> Option<&T> {
+    pub fn last_node<'a>(&'a self) -> Option<&'a T> {
         trace!("last_node()");
+        // We can deref its pointer because `inner` owns it and we own `inner`
+        // We need to hack around the borrow checker to "prove" that
+        // the ref extracted from `NonNull` has the same lifetime as `&self`
         self.inner
             .last_node()
             .map(|nn| unsafe { (*nn.as_ptr()).value() })
@@ -187,6 +189,9 @@ impl<'a, T> Iterator for &'a mut Iter<T> {
     fn next(&mut self) -> Option<Self::Item> {
         trace!("next()");
 
+        // We can deref its pointer because `inner` owns it and we own `inner`
+        // We need to hack around the borrow checker to "prove" that
+        // the ref extracted from `NonNull` has the same lifetime as `&self`
         let data = if let Some(ptr) = self.current {
             self.index += 1;
             Some(unsafe { (*ptr.as_ptr()).value() })
@@ -201,6 +206,9 @@ impl<'a, T> Iterator for &'a mut Iter<T> {
         debug_assert!((self.index <= self.len() && data.is_some()) || self.index >= self.len());
         debug_assert!((self.index > self.len() && data.is_none()) || self.index <= self.len());
 
+        // We can deref its pointer because `inner` owns it and we own `inner`
+        // We need to hack around the borrow checker to "prove" that
+        // the ref extracted from `NonNull` has the same lifetime as `&self`
         self.current = self
             .current
             .and_then(|n| unsafe { (*n.as_ptr()).next() })

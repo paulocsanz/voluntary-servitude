@@ -33,6 +33,14 @@ impl<T: Debug> Debug for Atomic<T> {
 
 impl<T> Atomic<T> {
     /// Inner swap, helper to swap `Atomic` values
+    ///
+    /// # Safety
+    ///
+    /// It's unsafe because we can't be sure of the ownership of the object pointed by `new`.
+    ///
+    /// To call this you must ensure the object pointed by `new` is owned by no-one, so `Atomic` will take its ownership.
+    ///
+    /// Nobody can use these pointers (without using `Atomic`'s API) or drop them after calling this function
     #[inline]
     unsafe fn inner_swap(&self, new: *mut T, order: Ordering) -> Box<T> {
         Box::from_raw(self.0.swap(new, order))
@@ -89,6 +97,8 @@ impl<T> Atomic<T> {
     where
         V: Into<Box<T>>,
     {
+        // We own `V` so we can pass its ownership to `append_chain`
+        // And we don't drop it
         unsafe { self.inner_swap(new.into().into_ptr(), order) }
     }
 
@@ -102,6 +112,9 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn into_inner(self) -> Box<T> {
+        // We can pass `null_mut` to extract the inner value
+        // Because the `Atomic` will be dropped after this, so it won't be derefed
+        // (and our `Drop` actually supports `null`)
         unsafe { self.inner_swap(null_mut(), Ordering::Relaxed) }
     }
 
@@ -208,6 +221,8 @@ impl<T> Drop for Atomic<T> {
     #[inline]
     fn drop(&mut self) {
         info!("Drop");
+        // `Box::from_raw` requires unsafe, but since we own what it points to
+        // And we do a `null` check we can `Box` it to drop without problems
         NonNull::new(self.0.swap(null_mut(), Ordering::Relaxed))
             .map_or((), |nn| drop(unsafe { Box::from_raw(nn.as_ptr()) }));
     }

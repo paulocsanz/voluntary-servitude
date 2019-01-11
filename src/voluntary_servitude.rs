@@ -19,9 +19,6 @@ pub struct Inner<T> {
     last_node: AtomicPtr<Node<T>>,
 }
 
-unsafe impl<T: Sync> Sync for Inner<T> {}
-unsafe impl<T: Send> Send for Inner<T> {}
-
 impl<T> Default for Inner<T> {
     #[inline]
     fn default() -> Self {
@@ -83,14 +80,28 @@ impl<T> Inner<T> {
     }
 
     /// Unsafelly append a `Node<T>` chain to `Inner<T>`
+    ///
+    /// # Safety
+    ///
+    /// It's unsafe because we can't be sure of the ownership of `first` or `last`.
+    ///
+    /// To call this you must ensure the objects pointed by `first` and `last` are owned by no-one, so `Inner` will take its ownership.
+    ///
+    /// Nobody can use these pointers (without using `Inner`'s API) or drop them after calling this function
+    ///
+    /// (The objects pointed must exist while `Inner` exists and they can't be accessed after)
     #[inline]
     pub unsafe fn append_chain(&self, first: *mut Node<T>, last: *mut Node<T>, length: usize) {
         debug!("append_chain({:p}, {:p}, {})", first, last, length);
         if let Some(nn) = self.swap_last(last) {
+            // To call `Box::from_raw` unsafe is needed
+            // But since `Inner` owns what they point to, it can be sure they will exist while `Inner` does
+            // (as long as `append_chain` was properly called)
             #[allow(unused)]
             let old = nn.as_ref().try_store_next(Box::from_raw(first));
             debug_assert!(old.is_ok());
         } else {
+            // To call `Box::from_raw` you must make sure `Inner` now owns the `Node<T>`
             let _ = self.set_first(Box::from_raw(first));
         }
 
@@ -102,6 +113,8 @@ impl<T> Inner<T> {
     #[inline]
     pub fn append(&self, value: T) {
         let ptr = Node::new(value).into_ptr();
+        // We own `Node<T>` so we can pass its ownership to `append_chain`
+        // And we don't drop it
         unsafe { self.append_chain(ptr, ptr, 1) };
     }
 
@@ -389,6 +402,8 @@ impl<T> VoluntaryServitude<T> {
     pub fn extend<I: IntoIterator<Item = T>>(&self, iter: I) {
         trace!("extend()");
         let (size, first, last) = Inner::from_iter(iter).into_inner();
+        // We own `Inner<T>` so we can pass its ownership of its nodes to `append_chain`
+        // And we don't drop them
         unsafe { self.0.read().append_chain(first, last, size) };
     }
 }
@@ -500,11 +515,13 @@ mod tests {
     fn test_send() {
         fn assert_send<T: Send>() {}
         assert_send::<VoluntaryServitude<()>>();
+        assert_send::<Inner<()>>();
     }
 
     #[test]
     fn test_sync() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<VoluntaryServitude<()>>();
+        assert_sync::<Inner<()>>();
     }
 }
