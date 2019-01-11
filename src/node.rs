@@ -36,14 +36,14 @@ impl<T> Node<T> {
     #[inline]
     pub fn next(&self) -> Option<&Self> {
         trace!("next()");
-        self.next.get_ref(Ordering::SeqCst)
+        self.next.get_ref(Ordering::Relaxed)
     }
 
     /// Inserts next as if there was None
     #[inline]
     pub fn try_store_next(&self, node: Box<Self>) -> Result<(), NotEmpty> {
         trace!("try_store_next({:p})", node);
-        self.next.try_store(node, Ordering::SeqCst)
+        self.next.try_store(node, Ordering::Relaxed)
     }
 }
 
@@ -52,9 +52,9 @@ impl<T> Drop for Node<T> {
     #[inline]
     fn drop(&mut self) {
         debug!("Drop nodes");
-        let mut node = self.next.take(Ordering::SeqCst);
+        let mut node = self.next.take(Ordering::Relaxed);
         while let Some(mut n) = node {
-            node = n.next.take(Ordering::SeqCst);
+            node = n.next.take(Ordering::Relaxed);
         }
     }
 }
@@ -64,7 +64,7 @@ impl<T: Debug> Debug for Node<T> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("Node")
             .field("value", &self.value)
-            .field("next", &self.next.get_ref(Ordering::SeqCst))
+            .field("next", &self.next.get_ref(Ordering::Relaxed))
             .finish()
     }
 }

@@ -63,7 +63,7 @@ impl<T> Atomic<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let filled = Atomic::from(10);
-    /// filled.store(5, Ordering::SeqCst);
+    /// filled.store(5, Ordering::Relaxed);
     /// assert_eq!(*filled.into_inner(), 5);
     /// ```
     #[inline]
@@ -81,7 +81,7 @@ impl<T> Atomic<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = Atomic::from(10);
-    /// assert_eq!(*option.swap(4, Ordering::SeqCst), 10);
+    /// assert_eq!(*option.swap(4, Ordering::Relaxed), 10);
     /// assert_eq!(*option.into_inner(), 4);
     /// ```
     #[inline]
@@ -102,7 +102,7 @@ impl<T> Atomic<T> {
     /// ```
     #[inline]
     pub fn into_inner(self) -> Box<T> {
-        unsafe { self.inner_swap(null_mut(), Ordering::SeqCst) }
+        unsafe { self.inner_swap(null_mut(), Ordering::Relaxed) }
     }
 
     /// Creates new `Atomic` if pointer is not null (like `NonNull`)
@@ -170,7 +170,7 @@ impl<T> Atomic<T> {
     ///
     /// let ptr = Box::into_raw(Box::new(10u8));
     /// let filled = unsafe { Atomic::from_raw(ptr) };
-    /// assert_eq!(filled.map(|a| a.get_raw(Ordering::SeqCst)), Some(ptr));
+    /// assert_eq!(filled.map(|a| a.get_raw(Ordering::Relaxed)), Some(ptr));
     ///
     /// // You should probably never deref `ptr`
     /// // You should probably never use this method
@@ -200,7 +200,7 @@ impl<T> From<Box<T>> for Atomic<T> {
 impl<T> Pointer for Atomic<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
+        Debug::fmt(&self.get_raw(Ordering::Relaxed), f)
     }
 }
 
@@ -208,7 +208,7 @@ impl<T> Drop for Atomic<T> {
     #[inline]
     fn drop(&mut self) {
         info!("Drop");
-        NonNull::new(self.0.swap(null_mut(), Ordering::SeqCst))
+        NonNull::new(self.0.swap(null_mut(), Ordering::Relaxed))
             .map_or((), |nn| drop(unsafe { Box::from_raw(nn.as_ptr()) }));
     }
 }

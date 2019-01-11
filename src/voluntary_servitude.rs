@@ -38,7 +38,7 @@ impl<T> Inner<T> {
     /// Atomically extracts pointer to first node
     #[inline]
     pub fn first_node(&self) -> Option<NonNull<Node<T>>> {
-        let nn = NonNull::new(self.first_node.get_raw(Ordering::SeqCst));
+        let nn = NonNull::new(self.first_node.get_raw(Ordering::Relaxed));
         trace!("first_node() = {:?}", nn);
         nn
     }
@@ -46,7 +46,7 @@ impl<T> Inner<T> {
     /// Atomically extracts pointer to last node
     #[inline]
     pub fn last_node(&self) -> Option<NonNull<Node<T>>> {
-        let nn = NonNull::new(self.last_node.load(Ordering::SeqCst));
+        let nn = NonNull::new(self.last_node.load(Ordering::Relaxed));
         trace!("last_node() = {:?}", nn);
         nn
     }
@@ -54,7 +54,7 @@ impl<T> Inner<T> {
     /// Atomically extracts `Inner`'s size
     #[inline]
     pub fn len(&self) -> usize {
-        let len = self.size.load(Ordering::SeqCst);
+        let len = self.size.load(Ordering::Relaxed);
         trace!("len() = {}", len);
         len
     }
@@ -70,7 +70,7 @@ impl<T> Inner<T> {
     #[inline]
     fn set_first(&self, node: Box<Node<T>>) -> Result<(), NotEmpty> {
         trace!("set_first({:p})", node);
-        let ret = self.first_node.try_store(node, Ordering::SeqCst);
+        let ret = self.first_node.try_store(node, Ordering::Relaxed);
         debug_assert!(ret.is_ok());
         ret
     }
@@ -79,7 +79,7 @@ impl<T> Inner<T> {
     #[inline]
     fn swap_last(&self, ptr: *mut Node<T>) -> Option<NonNull<Node<T>>> {
         trace!("swap_last({:p})", ptr);
-        NonNull::new(self.last_node.swap(ptr, Ordering::SeqCst))
+        NonNull::new(self.last_node.swap(ptr, Ordering::Relaxed))
     }
 
     /// Unsafelly append a `Node<T>` chain to `Inner<T>`
@@ -95,7 +95,7 @@ impl<T> Inner<T> {
         }
 
         info!("Increased size by {}", length);
-        let _ = self.size.fetch_add(length, Ordering::SeqCst);
+        let _ = self.size.fetch_add(length, Ordering::Relaxed);
     }
 
     /// Appends node to end of `Inner` (inserts first_node if it's the first)
@@ -107,11 +107,11 @@ impl<T> Inner<T> {
 
     #[inline]
     /// Extracts chain and drops itself without dropping it
-    pub fn into_inner(mut self) -> (usize, *mut Node<T>, *mut Node<T>) {
+    pub fn into_inner(self) -> (usize, *mut Node<T>, *mut Node<T>) {
         trace!("into_inner()");
-        let size = self.size.swap(0, Ordering::SeqCst);
-        let first = self.first_node.take(Ordering::SeqCst).into_ptr();
-        let last = self.last_node.swap(null_mut(), Ordering::SeqCst);
+        let size = self.size.into_inner();
+        let first = self.first_node.into_inner().into_ptr();
+        let last = self.last_node.into_inner();
         (size, first, last)
     }
 }

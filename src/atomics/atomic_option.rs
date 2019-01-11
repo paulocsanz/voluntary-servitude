@@ -60,10 +60,10 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
-    /// let old = option.try_store(5, Ordering::SeqCst);
+    /// let old = option.try_store(5, Ordering::Relaxed);
     /// assert!(old.is_ok());
     ///
-    /// let failed_to_store = option.try_store(10, Ordering::SeqCst);
+    /// let failed_to_store = option.try_store(10, Ordering::Relaxed);
     /// assert!(failed_to_store.is_err());
     /// assert_eq!(option.into_inner().map(|a| *a), Some(5));
     /// ```
@@ -85,7 +85,7 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option: AtomicOption<u8> = AtomicOption::new(None);
-    /// option.store(Box::new(3), Ordering::SeqCst);
+    /// option.store(Box::new(3), Ordering::Relaxed);
     /// assert_eq!(option.into_inner().map(|a| *a), Some(3));
     /// ```
     #[inline]
@@ -103,9 +103,9 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::default();
-    /// assert_eq!(option.swap(Box::new(5), Ordering::SeqCst), None);
-    /// assert_eq!(option.swap(None, Ordering::SeqCst), Some(Box::new(5)));
-    /// # assert_eq!(option.swap(Box::new(3), Ordering::SeqCst), None);
+    /// assert_eq!(option.swap(Box::new(5), Ordering::Relaxed), None);
+    /// assert_eq!(option.swap(None, Ordering::Relaxed), Some(Box::new(5)));
+    /// # assert_eq!(option.swap(Box::new(3), Ordering::Relaxed), None);
     /// ```
     #[inline]
     pub fn swap<V>(&self, new: V, order: Ordering) -> Option<Box<T>>
@@ -125,9 +125,9 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = AtomicOption::from(5);
-    /// assert_eq!(option.take(Ordering::SeqCst), Some(Box::new(5)));
-    /// assert_eq!(option.take(Ordering::SeqCst), None);
-    /// # assert_eq!(option.take(Ordering::SeqCst), None);
+    /// assert_eq!(option.take(Ordering::Relaxed), Some(Box::new(5)));
+    /// assert_eq!(option.take(Ordering::Relaxed), None);
+    /// # assert_eq!(option.take(Ordering::Relaxed), None);
     /// ```
     #[inline]
     pub fn take(&self, order: Ordering) -> Option<Box<T>> {
@@ -147,7 +147,7 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let ten = AtomicOption::from(10);
-    /// assert_eq!(unsafe { &*ten.atomic_ptr().load(Ordering::SeqCst) }, &10);
+    /// assert_eq!(unsafe { &*ten.atomic_ptr().load(Ordering::Relaxed) }, &10);
     /// ```
     #[inline]
     pub unsafe fn atomic_ptr(&self) -> &AtomicPtr<T> {
@@ -165,7 +165,7 @@ impl<T> AtomicOption<T> {
     /// ```
     #[inline]
     pub fn into_inner(self) -> Option<Box<T>> {
-        self.swap(None, Ordering::SeqCst)
+        self.swap(None, Ordering::Relaxed)
     }
 
     /// Creates new `AtomicOption` based on raw pointer
@@ -207,11 +207,11 @@ impl<T> AtomicOption<T> {
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty: AtomicOption<()> = AtomicOption::new(None);
-    /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
+    /// assert_eq!(empty.get_raw(Ordering::Relaxed), null_mut());
     ///
     /// let ptr = Box::into_raw(10u8.into());
     /// let filled = unsafe { AtomicOption::from_raw(ptr) };
-    /// assert_eq!(filled.get_raw(Ordering::SeqCst), ptr);
+    /// assert_eq!(filled.get_raw(Ordering::Relaxed), ptr);
     ///
     /// // You should probably never deref `ptr`
     /// // You should probably never use this method
@@ -280,7 +280,7 @@ impl<T> From<Atomic<T>> for AtomicOption<T> {
 impl<T> Pointer for AtomicOption<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
+        Debug::fmt(&self.get_raw(Ordering::Relaxed), f)
     }
 }
 
@@ -288,7 +288,7 @@ impl<T> Drop for AtomicOption<T> {
     #[inline]
     fn drop(&mut self) {
         info!("Drop");
-        drop(self.take(Ordering::SeqCst))
+        drop(self.take(Ordering::Relaxed))
     }
 }
 

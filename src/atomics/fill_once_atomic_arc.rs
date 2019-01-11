@@ -17,10 +17,10 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::sync::{Arc, atomic::Ordering};
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicArc::new(Arc::new(10));
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub fn new<V>(data: V) -> Self
@@ -40,13 +40,13 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicArc::default();
-    /// let old = option.try_store(5, Ordering::SeqCst);
+    /// let old = option.try_store(5, Ordering::Relaxed);
     /// assert!(old.is_ok());
-    /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
+    /// assert_eq!(option.get_ref(Ordering::Relaxed), Some(&5));
     ///
-    /// let failed_to_store = option.try_store(10, Ordering::SeqCst);
+    /// let failed_to_store = option.try_store(10, Ordering::Relaxed);
     /// assert!(failed_to_store.is_err());
-    /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
+    /// assert_eq!(option.get_ref(Ordering::Relaxed), Some(&5));
     /// ```
     #[inline]
     pub fn try_store<V>(&self, data: V, order: Ordering) -> Result<(), NotEmpty>
@@ -63,10 +63,10 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
-    /// assert_eq!(empty.load(Ordering::SeqCst), None);
+    /// assert_eq!(empty.load(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicArc::from(10);
-    /// assert_eq!(filled.load(Ordering::SeqCst).map(|a| *a), Some(10));
+    /// assert_eq!(filled.load(Ordering::Relaxed).map(|a| *a), Some(10));
     /// ```
     #[inline]
     pub fn load(&self, order: Ordering) -> Option<Arc<T>> {
@@ -80,10 +80,10 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicArc::from(10);
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub fn get_ref(&self, order: Ordering) -> Option<&T> {
@@ -116,11 +116,11 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::{sync::Arc, sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicArc::<()>::from_raw(null_mut()) };
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let ptr = Box::into_raw(Box::new(Arc::new(10)));
     /// let filled = unsafe { FillOnceAtomicArc::from_raw(ptr) };
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub unsafe fn from_raw(ptr: *mut Arc<T>) -> Self {
@@ -143,10 +143,10 @@ impl<T> FillOnceAtomicArc<T> {
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicArc<()> = FillOnceAtomicArc::new(None);
-    /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
+    /// assert_eq!(empty.get_raw(Ordering::Relaxed), null_mut());
     ///
     /// let filled = FillOnceAtomicArc::from(10);
-    /// assert_eq!(unsafe { (&*filled.get_raw(Ordering::SeqCst)).deref().deref() }, &10);
+    /// assert_eq!(unsafe { (&*filled.get_raw(Ordering::Relaxed)).deref().deref() }, &10);
     /// ```
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut Arc<T> {
@@ -186,7 +186,7 @@ impl<T> From<Option<Arc<T>>> for FillOnceAtomicArc<T> {
 impl<T> Pointer for FillOnceAtomicArc<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
+        Debug::fmt(&self.get_raw(Ordering::Relaxed), f)
     }
 }
 
@@ -194,7 +194,7 @@ impl<T: Debug> Debug for FillOnceAtomicArc<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_tuple("FillOnceAtomicArc")
-            .field(&self.load(Ordering::SeqCst))
+            .field(&self.load(Ordering::Relaxed))
             .finish()
     }
 }

@@ -23,10 +23,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicOption::new(Box::new(10));
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub fn new<V>(data: V) -> Self
@@ -45,13 +45,13 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let option = FillOnceAtomicOption::default();
-    /// let old = option.try_store(5, Ordering::SeqCst);
+    /// let old = option.try_store(5, Ordering::Relaxed);
     /// assert!(old.is_ok());
-    /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
+    /// assert_eq!(option.get_ref(Ordering::Relaxed), Some(&5));
     ///
-    /// let failed_to_store = option.try_store(10, Ordering::SeqCst);
+    /// let failed_to_store = option.try_store(10, Ordering::Relaxed);
     /// assert!(failed_to_store.is_err());
-    /// assert_eq!(option.get_ref(Ordering::SeqCst), Some(&5));
+    /// assert_eq!(option.get_ref(Ordering::Relaxed), Some(&5));
     /// ```
     #[inline]
     pub fn try_store<V>(&self, data: V, order: Ordering) -> Result<(), NotEmpty>
@@ -72,9 +72,9 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let mut option = FillOnceAtomicOption::from(5);
-    /// assert_eq!(option.take(Ordering::SeqCst), Some(Box::new(5)));
-    /// assert_eq!(option.take(Ordering::SeqCst), None);
-    /// # assert_eq!(option.take(Ordering::SeqCst), None);
+    /// assert_eq!(option.take(Ordering::Relaxed), Some(Box::new(5)));
+    /// assert_eq!(option.take(Ordering::Relaxed), None);
+    /// # assert_eq!(option.take(Ordering::Relaxed), None);
     /// ```
     #[inline]
     pub fn take(&mut self, order: Ordering) -> Option<Box<T>> {
@@ -91,10 +91,10 @@ impl<T: Copy> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
-    /// assert_eq!(empty.load(Ordering::SeqCst), None);
+    /// assert_eq!(empty.load(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicOption::from(10);
-    /// assert_eq!(filled.load(Ordering::SeqCst), Some(10));
+    /// assert_eq!(filled.load(Ordering::Relaxed), Some(10));
     /// ```
     #[inline]
     pub fn load(&self, order: Ordering) -> Option<T> {
@@ -110,10 +110,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::sync::atomic::Ordering;
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let filled = FillOnceAtomicOption::from(10);
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub fn get_ref(&self, order: Ordering) -> Option<&T> {
@@ -148,10 +148,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut};
     /// let empty = unsafe { FillOnceAtomicOption::<()>::from_raw(null_mut()) };
-    /// assert_eq!(empty.get_ref(Ordering::SeqCst), None);
+    /// assert_eq!(empty.get_ref(Ordering::Relaxed), None);
     ///
     /// let filled = unsafe { FillOnceAtomicOption::from_raw(Box::into_raw(10.into())) };
-    /// assert_eq!(filled.get_ref(Ordering::SeqCst), Some(&10));
+    /// assert_eq!(filled.get_ref(Ordering::Relaxed), Some(&10));
     /// ```
     #[inline]
     pub unsafe fn from_raw(ptr: *mut T) -> Self {
@@ -173,10 +173,10 @@ impl<T> FillOnceAtomicOption<T> {
     /// # env_logger::init();
     /// use std::{sync::atomic::Ordering, ptr::null_mut, ops::Deref};
     /// let empty: FillOnceAtomicOption<()> = FillOnceAtomicOption::new(None);
-    /// assert_eq!(empty.get_raw(Ordering::SeqCst), null_mut());
+    /// assert_eq!(empty.get_raw(Ordering::Relaxed), null_mut());
     ///
     /// let filled = FillOnceAtomicOption::from(10);
-    /// assert_eq!(unsafe { (&*filled.get_raw(Ordering::SeqCst)).deref() }, &10);
+    /// assert_eq!(unsafe { (&*filled.get_raw(Ordering::Relaxed)).deref() }, &10);
     /// ```
     #[inline]
     pub fn get_raw(&self, order: Ordering) -> *mut T {
@@ -239,7 +239,7 @@ impl<T> From<Atomic<T>> for FillOnceAtomicOption<T> {
 impl<T> Pointer for FillOnceAtomicOption<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(&self.get_raw(Ordering::SeqCst), f)
+        Debug::fmt(&self.get_raw(Ordering::Relaxed), f)
     }
 }
 
@@ -247,7 +247,7 @@ impl<T: Debug> Debug for FillOnceAtomicOption<T> {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_tuple("FillOnceAtomicOption")
-            .field(&self.get_ref(Ordering::SeqCst))
+            .field(&self.get_ref(Ordering::Relaxed))
             .finish()
     }
 }
@@ -259,13 +259,13 @@ mod tests {
     #[test]
     fn fill_once_ref() {
         let atomic = FillOnceAtomicOption::from(Some(10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
-        assert_eq!(atomic.get_ref(Ordering::SeqCst), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
+        assert_eq!(atomic.get_ref(Ordering::Relaxed), Some(&10));
     }
 
     #[test]
