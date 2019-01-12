@@ -1,6 +1,6 @@
 [package]
 name = "voluntary-servitude"
-version = "4.0.6"
+version = "4.0.7"
 authors = ["Paulo Cabral Sanz <paulosanz@poli.ufrj.br>"]
 description = "Thread-safe appendable list with lock-free iterator"
 repository = "https://github.com/paulocsanz/voluntary-servitude"

@@ -80,6 +80,8 @@ impl<T> From<Arc<Inner<T>>> for Iter<T> {
 impl<T> Iter<T> {
     /// Returns reference to last element in list
     ///
+    /// `Relaxed` ordering is used to extract the `last_node`, so you shouldn't depend on this being sequentially consistent, this is more of a helper than something you should depend on
+    ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # env_logger::init();
@@ -101,6 +103,8 @@ impl<T> Iter<T> {
     /// Returns current iterator size (may grow, but not decrease, be careful with race-conditions)
     ///
     /// If `Iter` was originally empty or was already consumed it will not grow (`FusedIterator`)
+    ///
+    /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
@@ -130,6 +134,8 @@ impl<T> Iter<T> {
     }
 
     /// Checks if iterator's length is empty (will return `None` on `next`)
+    ///
+    /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;

@@ -297,6 +297,8 @@ impl<T> VoluntaryServitude<T> {
 
     /// Returns current size, be careful with race conditions when using it since other threads can change it right after the read
     ///
+    /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
+    ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
     /// # env_logger::init();
@@ -313,6 +315,8 @@ impl<T> VoluntaryServitude<T> {
     }
 
     /// Checks if `VS` is currently empty, be careful with race conditions when using it since other threads can change it right after the read
+    ///
+    /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
     /// # #[macro_use] extern crate voluntary_servitude;
