@@ -35,8 +35,7 @@ For a safe `AtomicArc` you must use some data-structure from `arc-swap`, `RwLock
 ### Single thread
 
 ```rust
-#[macro_use]
-extern crate voluntary_servitude;
+use voluntary_servitude::vs;
 
 fn main() {
     let (a, b, c) = (0usize, 1usize, 2usize);
@@ -76,8 +75,7 @@ fn main() {
 ### Multi-producer, multi-consumer
 
 ```rust
-#[macro_use]
-extern crate voluntary_servitude;
+use voluntary_servitude::vs;
 use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;

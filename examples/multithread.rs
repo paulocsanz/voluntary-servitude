@@ -1,4 +1,4 @@
-#[macro_use] extern crate voluntary_servitude;
+use voluntary_servitude::vs;
 use std::{sync::Arc, thread::spawn};
 
 const CONSUMERS: usize = 8;

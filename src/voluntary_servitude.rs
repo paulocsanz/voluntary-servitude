@@ -155,7 +155,7 @@ impl<T> FromIterator<T> for Inner<T> {
 /// # Single thread
 ///
 /// ```rust
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// # env_logger::init();
 /// let (a, b, c) = (0usize, 1usize, 2usize);
 /// // VS alias to VoluntaryServitude
@@ -193,7 +193,7 @@ impl<T> FromIterator<T> for Inner<T> {
 /// # Multi-producer, multi-consumer
 ///
 /// ```rust
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// use std::{sync::Arc, thread::spawn};
 ///
 /// const CONSUMERS: usize = 8;
@@ -243,7 +243,7 @@ impl<T> VoluntaryServitude<T> {
     /// Creates new empty `VS` (like `Default` trait)
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # use voluntary_servitude::VS;
     /// # env_logger::init();
     /// let list: VS<()> = VS::new();
@@ -258,7 +258,7 @@ impl<T> VoluntaryServitude<T> {
     /// Inserts element after last node
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![];
     /// let mut iter = list.iter();
@@ -280,7 +280,7 @@ impl<T> VoluntaryServitude<T> {
     /// Makes lock-free iterator based on `VS`
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.iter().collect::<Vec<_>>(), vec![&3, &2]);
@@ -300,7 +300,7 @@ impl<T> VoluntaryServitude<T> {
     /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// assert_eq!(list.len(), 2);
@@ -319,7 +319,7 @@ impl<T> VoluntaryServitude<T> {
     /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![];
     /// assert!(list.is_empty());
@@ -334,7 +334,7 @@ impl<T> VoluntaryServitude<T> {
     /// Clears list (iterators referencing the old chain will still work)
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.iter();
@@ -352,7 +352,7 @@ impl<T> VoluntaryServitude<T> {
     /// Clears list returning iterator to it (other iterators referencing the old chain will still work)
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let iter = list.empty();
@@ -371,7 +371,7 @@ impl<T> VoluntaryServitude<T> {
     /// Swaps two `VS`
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![3, 2];
     /// let list2 = vs![5, 4];
@@ -388,7 +388,7 @@ impl<T> VoluntaryServitude<T> {
     /// Extends `VS` like the `Extend` trait, but without a mutable reference
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![1, 2, 3];
     /// list.extend(vec![4, 5, 6]);

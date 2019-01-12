@@ -108,7 +108,7 @@
 /// [`voluntary_servitude`]: ./macro.voluntary_servitude.html
 ///
 /// ```
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// # env_logger::init();
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = vs![];
@@ -123,10 +123,10 @@
 /// ```
 #[macro_export]
 macro_rules! vs {
-    () => (voluntary_servitude![]);
-    ($elem: expr; $n: expr) => (voluntary_servitude![$elem; $n]);
-    ($($x: expr),+) => (voluntary_servitude![$($x),+]);
-    ($($x: expr,)+) => (voluntary_servitude![$($x,)+]);
+    () => ($crate::voluntary_servitude![]);
+    ($elem: expr; $n: expr) => ($crate::voluntary_servitude![$elem; $n]);
+    ($($x: expr),+) => ($crate::voluntary_servitude![$($x),+]);
+    ($($x: expr,)+) => ($crate::voluntary_servitude![$($x,)+]);
 }
 
 /// Creates new [`VS`] with specified elements as in the `vec!` macro
@@ -135,7 +135,7 @@ macro_rules! vs {
 ///
 /// ```
 /// # env_logger::init();
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// use voluntary_servitude::VS;
 /// let vs: VS<()> = voluntary_servitude![];
 /// assert!(vs.is_empty());
@@ -157,7 +157,7 @@ macro_rules! voluntary_servitude {
         }
         vs
     }};
-    ($($x: expr),+) => (voluntary_servitude![$($x,)+]);
+    ($($x: expr),+) => ($crate::voluntary_servitude![$($x,)+]);
     ($($x: expr,)+) => {{
         let vs = $crate::VS::default();
         $(vs.append($x);)+

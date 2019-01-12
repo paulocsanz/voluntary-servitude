@@ -9,8 +9,7 @@ impl<T: Send + Sync> VoluntaryServitude<T> {
     /// [`VS`]: ./type.VS.html
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
-    /// # extern crate env_logger;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let list = vs![1, 2, 3];
     /// list.par_extend(vec![4, 5, 6]);

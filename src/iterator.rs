@@ -14,7 +14,7 @@ use std::{iter::FusedIterator, ptr::NonNull, sync::Arc};
 /// To ensure it can exist after `VS` `Iterator` is implemented for `&mut Iter<T>`, so you may have to iterate over `&mut Iter<T>`
 ///
 /// ```rust
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// for number in &mut vs.iter() {
@@ -25,7 +25,7 @@ use std::{iter::FusedIterator, ptr::NonNull, sync::Arc};
 /// That can be avoided with iterator combinators
 ///
 /// ```rust
-/// # #[macro_use] extern crate voluntary_servitude;
+/// # use voluntary_servitude::vs;
 /// # env_logger::init();
 /// let vs = vs![3, 4, 5];
 /// let _ = vs.iter().map(|n| println!("Number: {}", n)).count();
@@ -83,7 +83,7 @@ impl<T> Iter<T> {
     /// `Relaxed` ordering is used to extract the `last_node`, so you shouldn't depend on this being sequentially consistent, this is more of a helper than something you should depend on
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let vs = vs![2, 3, 4];
     /// let iter = vs.iter();
@@ -107,7 +107,7 @@ impl<T> Iter<T> {
     /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let vs = vs![3];
     /// let iter = vs.iter();
@@ -138,7 +138,7 @@ impl<T> Iter<T> {
     /// `Relaxed` ordering is used to extract the length, so you shouldn't depend on this being sequentially consistent, only atomic
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let vs = vs![3];
     ///
@@ -167,7 +167,7 @@ impl<T> Iter<T> {
     /// Obtains current iterator index
     ///
     /// ```rust
-    /// # #[macro_use] extern crate voluntary_servitude;
+    /// # use voluntary_servitude::vs;
     /// # env_logger::init();
     /// let vs = vs![3, 4];
     /// let mut iter = &mut vs.iter();
