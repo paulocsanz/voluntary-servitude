@@ -1,60 +1,96 @@
-#[macro_use]
-extern crate criterion;
-#[macro_use]
-extern crate voluntary_servitude;
-
-use criterion::Criterion;
+use criterion::*;
 use std::iter::FromIterator;
-use voluntary_servitude::VS;
+use voluntary_servitude::{VS, vs};
 
-fn new(c: &mut Criterion) {
-    c.bench_function("new", move |b| b.iter(|| VS::<()>::new()));
+fn vs_new(c: &mut Criterion) {
+    c.bench_function("vs_new", move |b| b.iter(|| VS::<()>::new()));
 }
 
-fn append(c: &mut Criterion) {
+fn vs_append(c: &mut Criterion) {
     let vs: VS<u8> = VS::default();
-    c.bench_function("append", move |b| b.iter(|| vs.append(10)));
+    c.bench_function("vs_append", move |b| b.iter(|| vs.append(10)));
 }
 
-fn iter(c: &mut Criterion) {
+fn vs_iter(c: &mut Criterion) {
     let vs = vs![10u8; 1000];
-    c.bench_function("iter", move |b| b.iter(|| vs.iter()));
+    c.bench_function("vs_iter", move |b| b.iter(|| vs.iter()));
 }
 
-fn len(c: &mut Criterion) {
+fn vs_len(c: &mut Criterion) {
     let vs = vs![10u8; 1000];
-    c.bench_function("len", move |b| b.iter(|| vs.len()));
+    c.bench_function("vs_len", move |b| b.iter(|| vs.len()));
 }
 
-fn is_empty(c: &mut Criterion) {
+fn vs_is_empty(c: &mut Criterion) {
     let vs = vs![10u8; 1000];
-    c.bench_function("is_empty", move |b| b.iter(|| vs.is_empty()));
+    c.bench_function("vs_is_empty", move |b| b.iter(|| vs.is_empty()));
 }
 
-fn clear(c: &mut Criterion) {
-    c.bench_function("clear", move |b| b.iter(|| vs![2, 3].clear()));
+fn vs_clear(c: &mut Criterion) {
+    c.bench_function("vs_clear", move |b| b.iter(|| vs![2, 3].clear()));
 }
 
-fn empty(c: &mut Criterion) {
-    c.bench_function("empty", move |b| b.iter(|| vs![2, 3].empty()));
+fn vs_empty(c: &mut Criterion) {
+    c.bench_function("vs_empty", move |b| b.iter(|| vs![2, 3].empty()));
 }
 
-fn swap(c: &mut Criterion) {
+fn vs_swap(c: &mut Criterion) {
     let vs = vs![3, 2];
-    c.bench_function("swap", move |b| b.iter(|| vs.swap(&mut vs![2, 3])));
+    c.bench_function("vs_swap", move |b| b.iter(|| vs.swap(&mut vs![2, 3])));
 }
 
-fn extend(c: &mut Criterion) {
+fn vs_extend(c: &mut Criterion) {
     let vs = vs![3, 2];
-    c.bench_function("extend", move |b| b.iter(|| vs.extend(vs.iter().cloned())));
+    c.bench_function("vs_extend", move |b| b.iter(|| vs.extend(vec![1, 0, -1, -2, -3, -4])));
 }
 
-fn from_iter(c: &mut Criterion) {
+fn vs_from_iter(c: &mut Criterion) {
     let vs = vs![3, 2];
-    c.bench_function("from_iter", move |b| {
+    c.bench_function("vs_from_iter", move |b| {
         b.iter(|| VS::from_iter(vs.iter().cloned()))
     });
 }
 
-criterion_group!(methods, new, append, iter, len, is_empty, clear, empty, swap, extend, from_iter);
-criterion_main!(methods);
+fn vec_new(c: &mut Criterion) {
+    c.bench_function("vec_new", move |b| b.iter(|| Vec::<()>::new()));
+}
+
+fn vec_append(c: &mut Criterion) {
+    let mut vec: Vec<u8> = Vec::default();
+    c.bench_function("vec_append", move |b| b.iter(|| vec.push(10)));
+}
+
+fn vec_iter(c: &mut Criterion) {
+    let vec = vec![10u8; 1000];
+    c.bench_function("vec_iter", move |b| b.iter(|| vec.iter()));
+}
+
+fn vec_len(c: &mut Criterion) {
+    let vec = vec![10u8; 1000];
+    c.bench_function("vec_len", move |b| b.iter(|| vec.len()));
+}
+
+fn vec_is_empty(c: &mut Criterion) {
+    let vec = vec![10u8; 1000];
+    c.bench_function("vec_is_empty", move |b| b.iter(|| vec.is_empty()));
+}
+
+fn vec_clear(c: &mut Criterion) {
+    c.bench_function("vec_clear", move |b| b.iter(|| vec![2, 3].clear()));
+}
+
+fn vec_extend(c: &mut Criterion) {
+    let mut vec = vec![3, 2];
+    c.bench_function("vec_extend", move |b| b.iter(|| vec.extend(vec![1, 0, -1, -2, -3, -4])));
+}
+
+fn vec_from_iter(c: &mut Criterion) {
+    let vec = vec![3, 2];
+    c.bench_function("vec_from_iter", move |b| {
+        b.iter(|| Vec::from_iter(vec.iter().cloned()))
+    });
+}
+
+criterion_group!(vs, vs_new, vs_append, vs_iter, vs_len, vs_is_empty, vs_clear, vs_empty, vs_swap, vs_extend, vs_from_iter);
+//criterion_group!(vec, vec_new, vec_append, vec_iter, vec_len, vec_is_empty, vec_clear, vec_extend, vec_from_iter);
+criterion_main!(vs);//, vec);
